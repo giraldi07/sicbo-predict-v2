@@ -1,12 +1,11 @@
 
 import type {Metadata} from 'next';
 import './globals.css';
-import { FirebaseClientProvider } from '@/firebase';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
   title: 'Sicbo Oracle | AI Betting Strategy',
-  description: 'Advanced AI-powered Sic Bo pattern analysis and bankroll management system.',
+  description: 'Advanced AI-powered Sic Bo pattern analysis and bankroll management system with Supabase Cloud.',
 };
 
 export default function RootLayout({
@@ -15,17 +14,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
       </head>
-      <body className="font-body antialiased">
-        <FirebaseClientProvider>
-          {children}
-          <Toaster />
-        </FirebaseClientProvider>
+      <body className="font-body antialiased bg-[#050505]">
+        {children}
+        <Toaster />
       </body>
     </html>
   );
