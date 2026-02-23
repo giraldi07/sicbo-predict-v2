@@ -43,6 +43,10 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
+// Konfigurasi untuk Vercel agar tidak timeout (Max 60 detik)
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
+
 const MULTIPLIERS = [
   { level: 1, multiplier: 1, text: "Level 1 (Awal)" },
   { level: 2, multiplier: 3, text: "Level 2 (Pemulihan)" },
@@ -67,7 +71,6 @@ export default function SicboOracle() {
   const [prediction, setPrediction] = useState<PredictSicBoOutcomeOutput | null>(null);
   const [leopardStatus, setLeopardStatus] = useState<PredictLeopardOpportunityOutput | null>(null);
 
-  // Jika histori kosong, biarkan user merubah saldo lewat input modal awal
   useEffect(() => {
     if (history.length === 0) {
       setBalance(initialCapital);
@@ -113,10 +116,15 @@ export default function SicboOracle() {
         predictLeopardOpportunity({ gameHistory: formattedHistory.map(h => ({ dice: h.dice })) })
       ]);
 
-      setPrediction(pred);
-      setLeopardStatus(leopard);
+      if (pred) setPrediction(pred);
+      if (leopard) setLeopardStatus(leopard);
     } catch (error) {
       console.error("AI Error:", error);
+      toast({ 
+        variant: "destructive", 
+        title: "AI Oracle Gangguan", 
+        description: "Pastikan API Key sudah terpasang di Vercel Environment Variables." 
+      });
     } finally {
       setLoadingAI(false);
     }
@@ -205,7 +213,7 @@ export default function SicboOracle() {
     setShowResetModal(false);
     toast({ 
       title: "Data Dihapus", 
-      description: "Seluruh histori dan saldo telah dikembalikan ke kondisi awal sesuai modal yang Anda tentukan." 
+      description: "Seluruh histori dan saldo telah dikembalikan ke kondisi awal." 
     });
   };
 
@@ -526,7 +534,7 @@ export default function SicboOracle() {
               <AlertTriangle className="animate-pulse shrink-0" /> Konfirmasi Reset
             </DialogTitle>
             <DialogDescription className="text-muted-foreground font-medium pt-2 text-sm">
-              Tindakan ini akan menghapus seluruh histori permainan, mengembalikan saldo ke modal awal yang Anda tentukan (Rp {initialCapital.toLocaleString()}), dan mereset memori analisis AI.
+              Tindakan ini akan menghapus seluruh histori permainan dan memori analisis AI. Saldo akan kembali ke Rp {initialCapital.toLocaleString()}.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 md:gap-3 mt-6 flex flex-row justify-end">
@@ -538,4 +546,3 @@ export default function SicboOracle() {
     </div>
   );
 }
-
