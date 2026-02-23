@@ -88,19 +88,16 @@ export default function SicboOracle() {
   const [prediction, setPrediction] = useState<PredictSicBoOutcomeOutput | null>(null);
   const [leopardStatus, setLeopardStatus] = useState<PredictLeopardOpportunityOutput | null>(null);
 
-  // Sync balance with local capital if history is empty
+  // Sync balance with last entry in Firestore or initialCapital
   useEffect(() => {
-    if (history.length === 0 && !loadingHistory) setBalance(initialCapital);
-  }, [initialCapital, history.length, loadingHistory]);
-
-  // Calculate Balance from History
-  useEffect(() => {
-    if (history.length > 0) {
-      // Kita hitung saldo terakhir dari entri paling baru di Firestore jika tersedia, 
-      // atau kalkulasi ulang dari initialCapital.
-      // Untuk MVP, kita biarkan state balance dikelola lokal saat sesi berjalan.
+    if (!loadingHistory) {
+      if (history.length > 0) {
+        setBalance(history[0].currentBalance);
+      } else {
+        setBalance(initialCapital);
+      }
     }
-  }, [history]);
+  }, [history, loadingHistory, initialCapital]);
 
   const stats = useMemo(() => {
     if (history.length === 0) return { winRate: 0, profit: 0, totalGames: 0 };
@@ -115,7 +112,7 @@ export default function SicboOracle() {
   const currentLossStreak = useMemo(() => {
     let streak = 0;
     for (const roll of history) {
-      if (roll.isCorrectSize === false) streak++;
+      if (roll.isCorrectSize === false && !roll.isLeopard) streak++;
       else if (roll.isCorrectSize === true) break;
     }
     return streak;
@@ -154,7 +151,7 @@ export default function SicboOracle() {
     if (history.length > 0) {
       updatePredictions(history);
     }
-  }, [history.length]);
+  }, [history.length, updatePredictions]);
 
   const processRoll = useCallback(async (roll: number[]) => {
     const total = roll.reduce((a, b) => a + b, 0);

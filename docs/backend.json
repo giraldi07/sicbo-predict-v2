@@ -15,7 +15,9 @@
         "predictionSize": { "type": "string", "description": "Prediksi ukuran dari AI" },
         "predictionParity": { "type": "string", "description": "Prediksi paritas dari AI" },
         "isCorrectSize": { "type": "boolean", "description": "Ketepatan prediksi ukuran" },
-        "isCorrectParity": { "type": "boolean", "description": "Ketepatan prediksi paritas" }
+        "isCorrectParity": { "type": "boolean", "description": "Ketepatan prediksi paritas" },
+        "betAmount": { "type": "number", "description": "Jumlah taruhan pada putaran ini" },
+        "currentBalance": { "type": "number", "description": "Saldo setelah putaran selesai" }
       },
       "required": ["dice", "total", "createdAt"]
     }
