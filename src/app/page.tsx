@@ -40,6 +40,7 @@ import {
   type PredictLeopardOpportunityOutput 
 } from '@/ai/flows/predict-leopard-opportunity';
 import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const MULTIPLIERS = [
   { level: 1, multiplier: 1, text: "Level 1 (Awal)" },
@@ -119,7 +120,6 @@ export default function SicboOracle() {
     const isLeopard = roll[0] === roll[1] && roll[1] === roll[2];
 
     const predictedSize = prediction?.predictedSize;
-    
     const isCorrectSize = predictedSize ? (isBig ? 'BIG' : 'SMALL') === predictedSize : null;
 
     let newBalance = balance;
@@ -210,38 +210,38 @@ export default function SicboOracle() {
   };
 
   return (
-    <div className="min-h-screen bg-[#111] text-foreground font-body p-4 pb-20 md:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="min-h-screen bg-[#111] text-foreground font-body p-4 md:p-8 pb-24">
+      <div className="max-w-6xl mx-auto space-y-6">
         
         {/* Header Section */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-2xl shadow-primary/30">
-              <BrainCircuit className="text-white" size={32} />
+          <div className="flex items-center gap-3 md:gap-4">
+            <div className="w-12 h-12 md:w-14 md:h-14 bg-primary rounded-2xl flex items-center justify-center shadow-2xl shadow-primary/30 shrink-0">
+              <BrainCircuit className="text-white" size={28} />
             </div>
             <div>
-              <h1 className="text-3xl font-black tracking-tighter text-white uppercase italic">Sicbo Oracle <span className="text-primary font-normal">v2.0</span></h1>
-              <p className="text-[10px] text-muted-foreground font-bold flex items-center gap-2 tracking-widest uppercase">
+              <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-white uppercase italic">Sicbo Oracle <span className="text-primary font-normal">v2.0</span></h1>
+              <p className="text-[9px] md:text-[10px] text-muted-foreground font-bold flex items-center gap-2 tracking-widest uppercase">
                 <Zap size={12} className="text-accent fill-accent" /> Neural Pattern Recognition Active
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="bg-card/50 backdrop-blur-md border border-white/10 rounded-xl px-5 py-3 flex items-center gap-4 shadow-xl">
-              <Wallet className="text-accent" size={24} />
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase font-black">Bankroll Utama</p>
-                <p className="text-lg font-black text-white">{formatCurrency(balance)}</p>
+          <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto">
+            <div className="flex-1 md:flex-none bg-card/50 backdrop-blur-md border border-white/10 rounded-xl px-4 py-2 md:px-5 md:py-3 flex items-center gap-3 shadow-xl">
+              <Wallet className="text-accent shrink-0" size={20} />
+              <div className="min-w-0">
+                <p className="text-[9px] text-muted-foreground uppercase font-black truncate">Bankroll Utama</p>
+                <p className="text-sm md:text-lg font-black text-white truncate">{formatCurrency(balance)}</p>
               </div>
             </div>
-            <Button variant="outline" size="icon" onClick={() => setShowResetModal(true)} className="w-12 h-12 border-destructive/20 hover:bg-destructive/10 rounded-xl">
-              <Trash2 className="text-destructive" size={20} />
+            <Button variant="outline" size="icon" onClick={() => setShowResetModal(true)} className="w-10 h-10 md:w-12 md:h-12 border-destructive/20 hover:bg-destructive/10 rounded-xl shrink-0">
+              <Trash2 className="text-destructive" size={18} />
             </Button>
           </div>
         </header>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {[
             { label: 'Win Rate', value: `${stats.winRate}%`, icon: Trophy, color: 'text-accent', bg: 'bg-accent/10' },
             { label: 'Profit/Loss', value: formatCurrency(stats.profit), icon: TrendingUp, color: stats.profit >= 0 ? 'text-accent' : 'text-destructive', bg: stats.profit >= 0 ? 'bg-accent/10' : 'bg-destructive/10' },
@@ -249,13 +249,13 @@ export default function SicboOracle() {
             { label: 'Loss Streak', value: currentLossStreak, icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-500/10' },
           ].map((stat, i) => (
             <Card key={i} className="border-white/5 bg-white/5 backdrop-blur-sm hover:bg-white/10 transition-all duration-300">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className={`p-3 ${stat.bg} rounded-xl`}>
-                  <stat.icon size={20} className={stat.color} />
+              <CardContent className="p-3 md:p-4 flex items-center gap-3 md:gap-4">
+                <div className={cn("p-2 md:p-3 rounded-xl shrink-0", stat.bg)}>
+                  <stat.icon size={18} className={stat.color} />
                 </div>
-                <div>
-                  <p className="text-[10px] uppercase font-black text-muted-foreground tracking-wider">{stat.label}</p>
-                  <p className="text-xl font-black text-white">{stat.value}</p>
+                <div className="min-w-0">
+                  <p className="text-[9px] md:text-[10px] uppercase font-black text-muted-foreground tracking-wider truncate">{stat.label}</p>
+                  <p className="text-base md:text-xl font-black text-white truncate">{stat.value}</p>
                 </div>
               </CardContent>
             </Card>
@@ -268,83 +268,83 @@ export default function SicboOracle() {
           {/* Prediction Panel */}
           <div className="lg:col-span-8 space-y-6">
             <Card className="border-primary/30 bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] overflow-hidden relative shadow-2xl">
-              <div className="absolute top-0 right-0 p-6 flex gap-2">
+              <div className="absolute top-0 right-0 p-4 md:p-6 flex flex-col items-end gap-2 z-10">
                 <Button 
                   onClick={simulateRoll} 
                   variant="secondary" 
                   size="sm" 
-                  className="font-black text-[10px] uppercase h-8 px-4 bg-white/10 hover:bg-white/20 text-white border-none"
+                  className="font-black text-[9px] md:text-[10px] uppercase h-7 md:h-8 px-3 md:px-4 bg-white/10 hover:bg-white/20 text-white border-none"
                 >
-                  <Dices size={14} className="mr-2" /> Simulasi Roll
+                  <Dices size={14} className="mr-2" /> Simulasi
                 </Button>
-                <Badge variant={loadingAI ? "outline" : "default"} className={`${loadingAI ? "animate-pulse border-primary text-primary" : "bg-primary"} font-black px-3 py-1`}>
+                <Badge variant={loadingAI ? "outline" : "default"} className={cn("font-black px-2 md:px-3 py-1 text-[9px] md:text-xs", loadingAI ? "animate-pulse border-primary text-primary" : "bg-primary")}>
                   {loadingAI ? "MENELITI POLA..." : "ORACLE ONLINE"}
                 </Badge>
               </div>
               <CardHeader className="pb-2">
                 <CardTitle className="text-[10px] font-black text-muted-foreground uppercase flex items-center gap-2 tracking-widest">
-                  <Target size={14} className="text-primary" /> Prediksi Hasil Berikutnya
+                  <Target size={14} className="text-primary" /> Prediksi Berikutnya
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-8">
+              <CardContent className="space-y-6 md:space-y-8">
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                  <div className="space-y-1">
-                    <h2 className={`text-8xl font-black tracking-tighter transition-all duration-500 ${prediction?.predictedSize === 'BIG' ? 'text-primary' : 'text-accent'}`}>
+                  <div className="space-y-2">
+                    <h2 className={cn("text-6xl md:text-8xl font-black tracking-tighter transition-all duration-500", prediction?.predictedSize === 'BIG' ? 'text-primary' : 'text-accent')}>
                       {prediction?.predictedSize || '---'}
                     </h2>
                     <div className="flex items-center gap-3">
-                      <Badge className="bg-white/10 text-white border-none font-bold">PARITY: {prediction?.predictedParity || '---'}</Badge>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">AI Confidence: 84%</span>
+                      <Badge className="bg-white/10 text-white border-none font-bold text-[10px] md:text-xs">PARITY: {prediction?.predictedParity || '---'}</Badge>
+                      <span className="text-[9px] md:text-[10px] font-bold text-muted-foreground uppercase">Confidence: 84%</span>
                     </div>
                   </div>
-                  <div className="text-left md:text-right bg-white/5 p-4 rounded-2xl border border-white/5 backdrop-blur-md">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Saran Taruhan</p>
-                    <p className="text-3xl font-black text-accent">{formatCurrency(suggestedBet)}</p>
-                    <div className="mt-2 flex items-center justify-end gap-2">
-                      <Badge variant="outline" className="border-accent/30 text-accent text-[9px] font-black uppercase tracking-tighter">
+                  <div className="text-left md:text-right bg-white/5 p-4 rounded-2xl border border-white/5 backdrop-blur-md w-full md:w-auto">
+                    <p className="text-[9px] md:text-[10px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Saran Taruhan</p>
+                    <p className="text-2xl md:text-3xl font-black text-accent">{formatCurrency(suggestedBet)}</p>
+                    <div className="mt-2 flex items-center md:justify-end gap-2">
+                      <Badge variant="outline" className="border-accent/30 text-accent text-[8px] md:text-[9px] font-black uppercase tracking-tighter">
                         {MULTIPLIERS[betLevel].text}
                       </Badge>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-primary/5 rounded-2xl p-5 border border-primary/10 relative overflow-hidden group">
+                <div className="bg-primary/5 rounded-2xl p-4 md:p-5 border border-primary/10 relative overflow-hidden group">
                   <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
                   <p className="text-xs text-white/80 leading-relaxed italic font-medium">
-                    "{prediction?.reason || "Input minimal 3 hasil manual atau gunakan tombol 'Simulasi Roll' untuk memulai analisis pola."}"
+                    "{prediction?.reason || "Input minimal 3 hasil manual atau gunakan tombol 'Simulasi' untuk memulai analisis pola."}"
                   </p>
                 </div>
               </CardContent>
             </Card>
 
             {/* Leopard Alert Panel */}
-            <Card className={`border-2 transition-all duration-700 shadow-xl ${leopardStatus?.isLeopardOpportunity ? 'border-amber-500/50 bg-amber-500/5' : 'border-white/5 bg-white/2 opacity-60'}`}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-2xl shadow-lg ${leopardStatus?.isLeopardOpportunity ? 'bg-amber-500 shadow-amber-500/20' : 'bg-white/10'}`}>
-                      <Zap size={24} className={leopardStatus?.isLeopardOpportunity ? 'text-white animate-pulse' : 'text-muted-foreground'} />
+            <Card className={cn("border-2 transition-all duration-700 shadow-xl", leopardStatus?.isLeopardOpportunity ? 'border-amber-500/50 bg-amber-500/5' : 'border-white/5 bg-white/2 opacity-60')}>
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-center justify-between mb-4 md:mb-6">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className={cn("p-2 md:p-3 rounded-2xl shadow-lg", leopardStatus?.isLeopardOpportunity ? 'bg-amber-500 shadow-amber-500/20' : 'bg-white/10')}>
+                      <Zap size={20} className={leopardStatus?.isLeopardOpportunity ? 'text-white animate-pulse' : 'text-muted-foreground'} />
                     </div>
                     <div>
-                      <h3 className="font-black text-xl text-white">ANY (LEOPARD) TRACKER</h3>
-                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Analisis Frekuensi Statistik</p>
+                      <h3 className="font-black text-lg md:text-xl text-white">LEOPARD TRACKER</h3>
+                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Analisis Frekuensi</p>
                     </div>
                   </div>
                   {leopardStatus?.isLeopardOpportunity && (
-                    <Badge className="bg-amber-500 text-white animate-bounce font-black px-4 py-1 rounded-full shadow-lg">PELUANG TINGGI</Badge>
+                    <Badge className="bg-amber-500 text-white animate-bounce font-black px-3 md:px-4 py-1 rounded-full shadow-lg text-[10px]">PELUANG TINGGI</Badge>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <div className="bg-black/40 rounded-2xl p-4 border border-white/5 text-center">
-                    <p className="text-[10px] text-muted-foreground font-black uppercase mb-1">Jarak Roll Terakhir</p>
-                    <p className="text-3xl font-black text-white tracking-tighter">{leopardStatus?.rollsSinceLastLeopard ?? '0'}</p>
+                <div className="grid grid-cols-2 gap-3 md:gap-6 mb-4 md:mb-6">
+                  <div className="bg-black/40 rounded-2xl p-3 md:p-4 border border-white/5 text-center">
+                    <p className="text-[9px] text-muted-foreground font-black uppercase mb-1">Jarak Roll</p>
+                    <p className="text-2xl md:text-3xl font-black text-white tracking-tighter">{leopardStatus?.rollsSinceLastLeopard ?? '0'}</p>
                   </div>
-                  <div className="bg-black/40 rounded-2xl p-4 border border-white/5 text-center">
-                    <p className="text-[10px] text-muted-foreground font-black uppercase mb-1">Threshold Rata-rata</p>
-                    <p className="text-3xl font-black text-white/40 tracking-tighter">36</p>
+                  <div className="bg-black/40 rounded-2xl p-3 md:p-4 border border-white/5 text-center">
+                    <p className="text-[9px] text-muted-foreground font-black uppercase mb-1">Threshold</p>
+                    <p className="text-2xl md:text-3xl font-black text-white/40 tracking-tighter">36</p>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground font-medium leading-relaxed bg-white/5 p-3 rounded-xl border border-white/5">
+                <p className="text-[11px] md:text-xs text-muted-foreground font-medium leading-relaxed bg-white/5 p-3 rounded-xl border border-white/5">
                   {leopardStatus?.reasoning || "Menunggu data histori yang cukup untuk memetakan probabilitas Leopard..."}
                 </p>
               </CardContent>
@@ -353,29 +353,30 @@ export default function SicboOracle() {
 
           {/* Sidebar */}
           <div className="lg:col-span-4 space-y-6">
-            <Card className="border-white/10 bg-[#1a1a1a] shadow-xl">
+            {/* Input Card */}
+            <Card className="border-white/10 bg-[#1a1a1a] shadow-xl overflow-hidden">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                <CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Input Hasil Manual</CardTitle>
+                <CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Input Hasil</CardTitle>
                 <Button variant="ghost" size="sm" onClick={handleUndo} className="h-8 text-[10px] font-black uppercase hover:bg-white/5">
                   <RotateCcw size={14} className="mr-2" /> Undo
                 </Button>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex justify-center gap-4">
+                <div className="flex justify-center gap-3 md:gap-4">
                   {[0, 1, 2].map(i => (
-                    <div key={i} className={`w-16 h-16 rounded-2xl flex items-center justify-center text-4xl font-black border-2 transition-all duration-300 ${
-                      currentRoll[i] ? 'bg-primary text-white border-primary shadow-[0_0_20px_rgba(var(--primary),0.3)] scale-110' : 'bg-white/5 border-white/5 text-muted-foreground'
-                    }`}>
+                    <div key={i} className={cn("w-14 h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center text-3xl md:text-4xl font-black border-2 transition-all duration-300", 
+                      currentRoll[i] ? 'bg-primary text-white border-primary shadow-[0_0_20px_rgba(var(--primary),0.3)] scale-105' : 'bg-white/5 border-white/5 text-muted-foreground'
+                    )}>
                       {currentRoll[i] || '?'}
                     </div>
                   ))}
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2 md:gap-3">
                   {[1, 2, 3, 4, 5, 6].map(n => (
                     <Button 
                       key={n} 
                       onClick={() => handleNumberClick(n)} 
-                      className="h-20 text-3xl font-black bg-white/5 hover:bg-primary transition-all duration-300 border-none rounded-2xl shadow-lg active:scale-95"
+                      className="h-16 md:h-20 text-2xl md:text-3xl font-black bg-white/5 hover:bg-primary transition-all duration-300 border-none rounded-2xl shadow-lg active:scale-95"
                     >
                       {n}
                     </Button>
@@ -384,32 +385,35 @@ export default function SicboOracle() {
               </CardContent>
             </Card>
 
-            <Card className="border-white/10 bg-[#1a1a1a] shadow-xl">
+            {/* Config Card */}
+            <Card className="border-white/10 bg-[#1a1a1a] shadow-xl overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 tracking-widest">
-                  <Settings2 size={14} /> Konfigurasi Strategi
+                  <Settings2 size={14} /> Konfigurasi
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Taruhan Dasar</label>
+                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Taruhan Dasar (IDR)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-black text-xs">Rp</span>
                     <Input 
                       type="number" 
                       value={baseBet} 
                       onChange={(e) => setBaseBet(Number(e.target.value))}
-                      className="bg-black/40 border-white/10 h-12 pl-12 font-black text-white rounded-xl focus:ring-primary"
+                      className="bg-black/40 border-white/10 h-10 md:h-12 pl-12 font-black text-white rounded-xl focus:ring-primary"
                     />
                   </div>
                 </div>
                 <div className="pt-4 border-t border-white/5">
-                  <p className="text-[10px] font-black text-muted-foreground uppercase mb-4 tracking-widest">Martingale Recovery Ladder</p>
-                  <div className="space-y-2">
+                  <p className="text-[9px] font-black text-muted-foreground uppercase mb-3 tracking-widest">Recovery Ladder</p>
+                  <div className="space-y-1.5">
                     {MULTIPLIERS.map((m, i) => (
-                      <div key={i} className={`flex justify-between items-center text-[10px] p-3 rounded-xl transition-all duration-300 ${i === betLevel ? 'bg-primary text-white font-black shadow-lg scale-105' : 'bg-white/5 text-muted-foreground'}`}>
-                        <span className="font-bold">{m.text}</span>
-                        <span className="font-black">x{m.multiplier} ({formatCurrency(baseBet * m.multiplier)})</span>
+                      <div key={i} className={cn("flex justify-between items-center text-[9px] p-2.5 rounded-xl transition-all duration-300", 
+                        i === betLevel ? 'bg-primary text-white font-black shadow-lg scale-105 z-10' : 'bg-white/5 text-muted-foreground'
+                      )}>
+                        <span className="font-bold truncate mr-2">{m.text}</span>
+                        <span className="font-black shrink-0">x{m.multiplier}</span>
                       </div>
                     ))}
                   </div>
@@ -422,58 +426,58 @@ export default function SicboOracle() {
         {/* History Log */}
         {history.length > 0 && (
           <Card className="border-white/10 bg-[#1a1a1a] overflow-hidden shadow-2xl">
-            <CardHeader className="bg-white/2 p-5">
+            <CardHeader className="bg-white/2 p-4 md:p-5">
               <CardTitle className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 tracking-widest">
-                <BarChart3 size={16} /> Log Aktivitas & Performa Oracle
+                <BarChart3 size={16} /> Log Aktivitas
               </CardTitle>
             </CardHeader>
             <div className="overflow-x-auto">
-              <table className="w-full text-center text-xs">
+              <table className="w-full text-center text-[11px] md:text-xs">
                 <thead>
-                  <tr className="bg-black/40 text-[9px] font-black text-muted-foreground uppercase border-b border-white/5 tracking-widest">
-                    <th className="p-4">Roll</th>
-                    <th className="p-4">Dadu</th>
-                    <th className="p-4">Poin</th>
-                    <th className="p-4">Hasil</th>
-                    <th className="p-4">Taruhan</th>
-                    <th className="p-4">Akurasi AI</th>
-                    <th className="p-4 text-right pr-8">Saldo Berjalan</th>
+                  <tr className="bg-black/40 text-[8px] md:text-[9px] font-black text-muted-foreground uppercase border-b border-white/5 tracking-widest">
+                    <th className="p-3 md:p-4">Roll</th>
+                    <th className="p-3 md:p-4">Dadu</th>
+                    <th className="p-3 md:p-4">Poin</th>
+                    <th className="p-3 md:p-4">Hasil</th>
+                    <th className="p-3 md:p-4 hidden sm:table-cell">Taruhan</th>
+                    <th className="p-3 md:p-4">AI</th>
+                    <th className="p-3 md:p-4 text-right pr-6 md:pr-8">Saldo</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {history.map((row) => (
                     <tr key={row.id} className="hover:bg-white/2 transition-colors group">
-                      <td className="p-4 text-muted-foreground font-bold">{row.num}</td>
-                      <td className="p-4">
+                      <td className="p-3 md:p-4 text-muted-foreground font-bold">{row.num}</td>
+                      <td className="p-3 md:p-4">
                         <div className="flex justify-center gap-1">
                           {row.dice.map((d: number, idx: number) => (
-                            <span key={idx} className="w-6 h-6 bg-white/10 rounded flex items-center justify-center text-[10px] font-black">{d}</span>
+                            <span key={idx} className="w-5 h-5 md:w-6 md:h-6 bg-white/10 rounded flex items-center justify-center text-[9px] md:text-[10px] font-black">{d}</span>
                           ))}
                         </div>
                       </td>
-                      <td className="p-4 font-black text-white text-sm">{row.total}</td>
-                      <td className="p-4">
-                        <Badge variant="outline" className={`border-none font-black ${row.isBig ? 'text-primary' : 'text-accent'}`}>
+                      <td className="p-3 md:p-4 font-black text-white text-xs md:text-sm">{row.total}</td>
+                      <td className="p-3 md:p-4">
+                        <Badge variant="outline" className={cn("border-none font-black text-[9px] md:text-[10px]", row.isBig ? 'text-primary' : 'text-accent')}>
                           {row.isBig ? 'BIG' : 'SMALL'}
                         </Badge>
                       </td>
-                      <td className="p-4 text-muted-foreground font-bold">{formatCurrency(row.betAmount)}</td>
-                      <td className="p-4">
+                      <td className="p-3 md:p-4 text-muted-foreground font-bold hidden sm:table-cell">{formatCurrency(row.betAmount)}</td>
+                      <td className="p-3 md:p-4">
                         {row.isCorrectSize !== null ? (
                           row.isCorrectSize ? (
-                            <div className="flex items-center justify-center gap-1 text-accent font-black uppercase text-[9px]">
-                              <CheckCircle2 size={14} /> Hit
+                            <div className="flex items-center justify-center gap-1 text-accent font-black uppercase text-[8px] md:text-[9px]">
+                              <CheckCircle2 size={12} className="md:size-14" /> Hit
                             </div>
                           ) : (
-                            <div className="flex items-center justify-center gap-1 text-destructive font-black uppercase text-[9px]">
-                              <XCircle size={14} /> Miss
+                            <div className="flex items-center justify-center gap-1 text-destructive font-black uppercase text-[8px] md:text-[9px]">
+                              <XCircle size={12} className="md:size-14" /> Miss
                             </div>
                           )
                         ) : (
                           <span className="text-white/20 font-black">---</span>
                         )}
                       </td>
-                      <td className="p-4 text-right pr-8 font-black text-white">{formatCurrency(row.currentBalance)}</td>
+                      <td className="p-3 md:p-4 text-right pr-6 md:pr-8 font-black text-white">{formatCurrency(row.currentBalance)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -485,18 +489,18 @@ export default function SicboOracle() {
 
       {/* Confirmation Modal */}
       <Dialog open={showResetModal} onOpenChange={setShowResetModal}>
-        <DialogContent className="bg-[#1a1a1a] border-white/10 sm:max-w-[425px] rounded-2xl">
+        <DialogContent className="bg-[#1a1a1a] border-white/10 w-[90%] max-w-[425px] rounded-2xl mx-auto">
           <DialogHeader>
-            <DialogTitle className="text-destructive flex items-center gap-3 text-xl font-black italic uppercase">
-              <AlertTriangle className="animate-pulse" /> Konfirmasi Reset
+            <DialogTitle className="text-destructive flex items-center gap-3 text-lg md:text-xl font-black italic uppercase">
+              <AlertTriangle className="animate-pulse shrink-0" /> Konfirmasi Reset
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground font-medium pt-2">
-              Tindakan ini akan menghapus seluruh histori permainan, mengembalikan saldo ke Rp 1.000.000, dan mereset memori analisis AI. Tindakan ini tidak dapat dibatalkan.
+            <DialogDescription className="text-muted-foreground font-medium pt-2 text-sm">
+              Tindakan ini akan menghapus seluruh histori permainan, mengembalikan saldo ke Rp 1.000.000, dan mereset memori analisis AI.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-3 mt-6">
-            <Button variant="secondary" onClick={() => setShowResetModal(false)} className="rounded-xl font-bold bg-white/5 hover:bg-white/10 border-none">Batal</Button>
-            <Button variant="destructive" onClick={resetAll} className="rounded-xl font-black uppercase tracking-widest shadow-lg shadow-destructive/20">Wipe Data</Button>
+          <DialogFooter className="gap-2 md:gap-3 mt-6 flex-row justify-end">
+            <Button variant="secondary" onClick={() => setShowResetModal(false)} className="rounded-xl font-bold bg-white/5 hover:bg-white/10 border-none text-xs h-9">Batal</Button>
+            <Button variant="destructive" onClick={resetAll} className="rounded-xl font-black uppercase tracking-widest shadow-lg shadow-destructive/20 text-xs h-9">Wipe Data</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
