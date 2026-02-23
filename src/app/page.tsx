@@ -71,6 +71,7 @@ export default function SicboOracle() {
   const [prediction, setPrediction] = useState<PredictSicBoOutcomeOutput | null>(null);
   const [leopardStatus, setLeopardStatus] = useState<PredictLeopardOpportunityOutput | null>(null);
 
+  // Fetch data dari Supabase
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
     const { data, error } = await supabase
@@ -84,6 +85,7 @@ export default function SicboOracle() {
       toast({ title: "Gagal memuat histori", variant: "destructive" });
     } else {
       setHistory(data || []);
+      // Update balance berdasarkan entry terbaru
       if (data && data.length > 0) {
         setBalance(data[0].currentBalance);
       } else {
@@ -96,13 +98,15 @@ export default function SicboOracle() {
   useEffect(() => {
     fetchHistory();
 
-    // Realtime subscription
+    // Berlangganan perubahan real-time
     const channel = supabase
       .channel('schema-db-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'game_history' },
-        () => fetchHistory()
+        () => {
+          fetchHistory();
+        }
       )
       .subscribe();
 
@@ -133,6 +137,7 @@ export default function SicboOracle() {
   const betLevel = Math.min(currentLossStreak, MULTIPLIERS.length - 1);
   const suggestedBet = baseBet * MULTIPLIERS[betLevel].multiplier;
 
+  // AI Update Logic
   const updatePredictions = useCallback(async (currentHistory: any[]) => {
     if (currentHistory.length < 3) return;
     setLoadingAI(true);
@@ -207,6 +212,7 @@ export default function SicboOracle() {
       createdAt: new Date().toISOString()
     };
 
+    // Simpan ke Supabase
     const { error } = await supabase.from('game_history').insert([newEntry]);
     
     if (error) {
@@ -233,6 +239,7 @@ export default function SicboOracle() {
 
   const resetAll = async () => {
     try {
+      // Hapus semua data di Supabase
       const { error } = await supabase.from('game_history').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       
       if (error) throw error;
@@ -256,6 +263,7 @@ export default function SicboOracle() {
   return (
     <div className="min-h-screen bg-[#050505] text-foreground">
       
+      {/* Permanent Sticky Header */}
       <header className="sticky top-0 z-[100] bg-[#050505]/90 backdrop-blur-2xl border-b border-white/5 py-3 px-4 md:px-8">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -299,6 +307,7 @@ export default function SicboOracle() {
           </div>
         )}
 
+        {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: 'Oracle Winrate', value: `${stats.winRate}%`, icon: Trophy, color: 'text-accent', bg: 'bg-accent/10' },
@@ -321,6 +330,7 @@ export default function SicboOracle() {
         </div>
 
         <div className="grid lg:grid-cols-12 gap-6">
+          {/* Main Prediction Area */}
           <div className="lg:col-span-8 space-y-6">
             
             <Card className="border-primary/30 bg-gradient-to-br from-[#0a0a0a] to-[#000] overflow-hidden shadow-2xl relative rounded-3xl">
@@ -430,6 +440,7 @@ export default function SicboOracle() {
             </div>
           </div>
 
+          {/* Controls Area */}
           <div className="lg:col-span-4 space-y-6">
             <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl overflow-hidden">
               <CardHeader className="bg-white/2 px-6 py-4">
@@ -509,6 +520,7 @@ export default function SicboOracle() {
           </div>
         </div>
 
+        {/* Audit Log / History */}
         {history.length > 0 && (
           <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl overflow-hidden shadow-2xl">
             <CardHeader className="bg-white/2 p-5 border-b border-white/5 flex flex-row items-center justify-between">
