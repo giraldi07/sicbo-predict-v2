@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview Leopard (Triple) Probability Analyzer.
+ * @fileOverview Leopard (Triple) Probability Analyzer with Robust Error Handling.
  */
 
 import {ai} from '@/ai/genkit';
@@ -38,6 +38,7 @@ const leopardPrompt = ai.definePrompt({
       { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
       { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
     ]
   },
   prompt: `Analisis probabilitas kemunculan Triple (Leopard) pada Sic Bo.
@@ -56,11 +57,12 @@ INSTRUKSI ANALISIS:
 });
 
 export async function predictLeopardOpportunity(input: PredictLeopardOpportunityInput): Promise<PredictLeopardOpportunityOutput> {
+  let rollsSinceLast = input.gameHistory.length;
+  let totalLeopards = 0;
+
   try {
     const { gameHistory } = input;
-    let totalLeopards = 0;
-    let rollsSinceLast = 0;
-    let foundAny = false;
+    let foundLast = false;
 
     for (let i = 0; i < gameHistory.length; i++) {
       const d = gameHistory[i].dice;
@@ -68,33 +70,33 @@ export async function predictLeopardOpportunity(input: PredictLeopardOpportunity
       
       if (isL) {
         totalLeopards++;
-        if (!foundAny) {
+        if (!foundLast) {
           rollsSinceLast = i;
-          foundAny = true;
+          foundLast = true;
         }
       }
     }
 
-    if (!foundAny) rollsSinceLast = gameHistory.length;
-
-    const {output} = await leopardPrompt({
+    const { output } = await leopardPrompt({
       rollsSinceLast,
       totalLeopards,
       historyLength: gameHistory.length
     });
     
+    if (!output) throw new Error("AI Blocked or Empty");
+
     return {
-      ...output!,
+      ...output,
       rollsSinceLastLeopard: rollsSinceLast,
       totalLeopardsInHistory: totalLeopards
     };
   } catch (error) {
     console.error("Leopard Flow Error:", error);
     return {
-      isLeopardOpportunity: false,
-      reasoning: "Gagal menghitung pola Leopard secara AI. Menggunakan estimasi statistik lokal.",
-      rollsSinceLastLeopard: 0,
-      totalLeopardsInHistory: 0
+      isLeopardOpportunity: rollsSinceLast > 36,
+      reasoning: "Analisis Statistik Lokal: " + (rollsSinceLast > 36 ? "Probabilitas Triple meningkat karena sudah melampaui rata-rata interval 36 roll." : "Interval Triple masih dalam rentang normal."),
+      rollsSinceLastLeopard: rollsSinceLast,
+      totalLeopardsInHistory: totalLeopards
     };
   }
 }

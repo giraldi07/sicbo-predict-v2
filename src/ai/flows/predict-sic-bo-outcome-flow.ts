@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview High-Precision Sic Bo Pattern Recognition Engine.
+ * @fileOverview High-Precision Sic Bo Pattern Recognition Engine with Ultra-Loose Safety.
  */
 
 import {ai} from '@/ai/genkit';
@@ -47,7 +47,6 @@ STRATEGI PEMBELAJARAN MESIN:
 1. DETEKSI DRAGON: Jika BIG keluar 4x berturut-turut, apakah akan berlanjut (Dragon) atau patah?
 2. DETEKSI CHOP: Jika pola berseling (B-S-B-S), prediksi elemen berikutnya dalam urutan.
 3. REGRESI MEAN: Jika dalam 20 roll terakhir BIG mendominasi 80%, prediksi SMALL karena keseimbangan statistik akan kembali.
-4. ANALISIS TOTAL: Perhatikan angka total yang sering muncul untuk menentukan probabilitas ganjil/genap.
 
 DATA HISTORI (Terbaru adalah yang pertama):
 {{#each history}}
@@ -59,23 +58,29 @@ Berikan prediksi yang paling tajam. Jelaskan logika probabilitas Anda dengan sin
 
 export async function predictSicBoOutcome(input: PredictSicBoOutcomeInput): Promise<PredictSicBoOutcomeOutput> {
   try {
-    const {output} = await predictSicBoOutcomeFlow(input);
-    if (!output) throw new Error("AI returned empty output");
+    const {output} = await predictSicBoPrompt(input);
+    if (!output) throw new Error("AI returned empty output due to safety filters");
     return output;
   } catch (error) {
-    console.error("SicBo Flow Critical Error:", error);
-    // Fallback logic jika AI gagal (Statistik sederhana)
-    const lastResult = input.history[0]?.isBig ? 'SMALL' : 'BIG';
+    console.error("SicBo Flow Error:", error);
+    
+    // Logika Statistik Lokal sebagai Fallback (Sangat penting agar aplikasi tetap jalan)
+    const history = input.history;
+    if (history.length === 0) {
+      return {
+        predictedSize: 'BIG',
+        predictedParity: 'EVEN',
+        reason: "Memulai analisis awal. Menunggu data histori untuk akurasi.",
+        confidence: 50
+      };
+    }
+
+    const lastResult = history[0].isBig;
     return {
-      predictedSize: lastResult,
-      predictedParity: Math.random() > 0.5 ? 'ODD' : 'EVEN',
-      reason: "Mode Pengaman: Menggunakan pola pembalikan tren terakhir untuk meminimalisir risiko.",
-      confidence: 50
+      predictedSize: lastResult ? 'SMALL' : 'BIG', // Strategi Reversal sederhana
+      predictedParity: history[0].isOdd ? 'EVEN' : 'ODD',
+      reason: "Oracle Oracle menggunakan Logika Probabilitas Reversal (Local Engine) karena gangguan koneksi AI.",
+      confidence: 55
     };
   }
-}
-
-async function predictSicBoOutcomeFlow(input: PredictSicBoOutcomeInput) {
-  const {output} = await predictSicBoPrompt(input);
-  return { output };
 }
