@@ -21,7 +21,8 @@ import {
   Bomb,
   Activity,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Database
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,7 +70,7 @@ export default function SicboOracle() {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [history, setHistory] = useState<any[]>([]);
   const [currentRoll, setCurrentRoll] = useState<number[]>([]);
-  const [configError, setConfigError] = useState<string | null>(null);
+  const [configError, setConfigError] = useState<{title: string, msg: string} | null>(null);
   
   const [prediction, setPrediction] = useState<PredictSicBoOutcomeOutput | null>(null);
   const [leopardStatus, setLeopardStatus] = useState<PredictLeopardOpportunityOutput | null>(null);
@@ -84,10 +85,20 @@ export default function SicboOracle() {
         .limit(50);
 
       if (error) {
-        if (error.message.includes("Forbidden")) {
-          setConfigError("Kunci API yang Anda gunakan adalah 'Secret Key'. Harap ganti dengan 'Anon Public Key' di src/lib/supabase.ts agar dapat berjalan di browser.");
+        if (error.message.includes("violates row-level security")) {
+          setConfigError({
+            title: "Security Policy (RLS) Error",
+            msg: "Silakan jalankan SQL 'CREATE POLICY' di Dashboard Supabase agar browser bisa mengakses data."
+          });
+        } else if (error.message.includes("relation \"game_history\" does not exist")) {
+          setConfigError({
+            title: "Table Not Found",
+            msg: "Tabel 'game_history' belum ada. Silakan buat tabel menggunakan SQL Editor di Supabase."
+          });
+        } else {
+          console.error("Fetch Error:", error);
         }
-        throw error;
+        return;
       }
       
       const gameHistory = data || [];
@@ -96,6 +107,7 @@ export default function SicboOracle() {
       
       if (gameHistory.length > 0) {
         setBalance(Number(gameHistory[0].currentBalance));
+        setInitialCapital(Number(gameHistory[gameHistory.length - 1].currentBalance) - (gameHistory[gameHistory.length - 1].isCorrectSize ? gameHistory[gameHistory.length - 1].betAmount : -gameHistory[gameHistory.length - 1].betAmount));
       } else {
         setBalance(initialCapital);
       }
@@ -225,7 +237,11 @@ export default function SicboOracle() {
     
     if (error) {
       console.error("Supabase Insert Error:", error.message);
-      toast({ title: "Gagal menyimpan ke Cloud. Pastikan RLS diizinkan dan tabel sudah ada.", variant: "destructive" });
+      if (error.message.includes("violates row-level security")) {
+        toast({ title: "Gagal: RLS Policy Aktif. Jalankan SQL Policy di Supabase.", variant: "destructive" });
+      } else {
+        toast({ title: "Gagal menyimpan ke Cloud.", variant: "destructive" });
+      }
     } else {
       setBalance(newBalance);
       setCurrentRoll([]);
@@ -257,7 +273,7 @@ export default function SicboOracle() {
       setCurrentRoll([]);
       setHistory([]);
       setShowResetModal(false);
-      toast({ title: "Supabase Cloud Berhasil Dibersihkan" });
+      toast({ title: "Cloud Database Berhasil Dibersihkan" });
     } catch (err: any) {
       console.error("Reset Error:", err.message);
       toast({ title: "Gagal menghapus data", variant: "destructive" });
@@ -269,26 +285,26 @@ export default function SicboOracle() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-foreground">
-      <header className="sticky top-0 z-[100] bg-[#050505]/90 backdrop-blur-2xl border-b border-white/5 py-3 px-4 md:px-8">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+    <div className="min-h-screen bg-[#050505] text-foreground pb-20">
+      <header className="sticky top-0 z-[100] bg-[#050505]/90 backdrop-blur-2xl border-b border-white/5 py-4 px-4 md:px-8">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 rotate-3">
               <BrainCircuit className="text-white" size={20} />
             </div>
-            <div className="hidden sm:block">
-              <h1 className="text-xl font-black tracking-tighter text-white uppercase italic leading-none">Oracle AI <span className="text-primary font-normal">Supabase</span></h1>
+            <div>
+              <h1 className="text-xl font-black tracking-tighter text-white uppercase italic leading-none">Oracle AI <span className="text-primary font-normal">Cloud</span></h1>
               <p className="text-[8px] text-muted-foreground font-black flex items-center gap-1 tracking-[0.2em] uppercase mt-0.5">
-                <ShieldCheck size={10} className="text-accent" /> Cloud Storage Active
+                <ShieldCheck size={10} className="text-accent" /> Secure Database Link
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 flex items-center gap-3">
-              <Wallet className="text-accent hidden xs:block" size={18} />
+              <Wallet className="text-accent hidden sm:block" size={18} />
               <div className="text-right sm:text-left">
-                <p className="text-[8px] text-muted-foreground uppercase font-black tracking-widest leading-none mb-1">Live Bankroll</p>
+                <p className="text-[8px] text-muted-foreground uppercase font-black tracking-widest leading-none mb-1">Live Balance</p>
                 <p className="text-sm sm:text-base font-black text-white leading-none">{formatIDR(balance)}</p>
               </div>
             </div>
@@ -296,7 +312,7 @@ export default function SicboOracle() {
               variant="outline" 
               size="icon" 
               onClick={() => setShowResetModal(true)} 
-              className="border-destructive/30 hover:bg-destructive/10 rounded-xl w-10 h-10 shrink-0"
+              className="border-destructive/30 hover:bg-destructive/10 rounded-xl"
             >
               <Trash2 className="text-destructive" size={18} />
             </Button>
@@ -306,19 +322,24 @@ export default function SicboOracle() {
 
       <main className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
         {configError && (
-          <Alert variant="destructive" className="bg-destructive/10 border-destructive/50 rounded-2xl">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle className="font-black uppercase text-[10px] tracking-widest">Configuration Error</AlertTitle>
+          <Alert variant="destructive" className="bg-destructive/10 border-destructive/50 rounded-2xl animate-in fade-in slide-in-from-top-4 duration-500">
+            <AlertCircle className="h-5 w-5" />
+            <AlertTitle className="font-black uppercase text-xs tracking-widest">{configError.title}</AlertTitle>
             <AlertDescription className="text-xs font-medium pt-1">
-              {configError}
+              {configError.msg}
             </AlertDescription>
+            <div className="mt-4 flex gap-2">
+              <Button size="sm" variant="outline" className="text-[9px] font-black uppercase h-7 border-destructive/30" onClick={() => fetchHistory()}>
+                Coba Lagi
+              </Button>
+            </div>
           </Alert>
         )}
 
-        {loadingHistory && !configError && (
-          <div className="flex items-center justify-center p-12 gap-3 text-primary">
-            <Loader2 className="animate-spin" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Sinkronisasi Cloud...</span>
+        {!configError && loadingHistory && (
+          <div className="flex flex-col items-center justify-center p-12 gap-4 text-primary">
+            <Loader2 className="animate-spin" size={32} />
+            <span className="text-[10px] font-black uppercase tracking-[0.5em]">Synchronizing Cloud Database...</span>
           </div>
         )}
 
@@ -326,8 +347,8 @@ export default function SicboOracle() {
           {[
             { label: 'Oracle Winrate', value: `${stats.winRate}%`, icon: Trophy, color: 'text-accent', bg: 'bg-accent/10' },
             { label: 'Net Profit', value: formatIDR(stats.profit), icon: TrendingUp, color: stats.profit >= 0 ? 'text-accent' : 'text-destructive', bg: stats.profit >= 0 ? 'bg-accent/10' : 'bg-destructive/10' },
-            { label: 'Total Games', value: `${stats.totalGames} Rounds`, icon: HistoryIcon, color: 'text-primary', bg: 'bg-primary/10' },
-            { label: 'Current Risk', value: currentLossStreak > 3 ? 'EXTREME' : 'STABLE', icon: Activity, color: currentLossStreak > 3 ? 'text-destructive' : 'text-accent', bg: currentLossStreak > 3 ? 'bg-destructive/10' : 'bg-accent/10' },
+            { label: 'Cloud Records', value: `${stats.totalGames} Rounds`, icon: Database, color: 'text-primary', bg: 'bg-primary/10' },
+            { label: 'Risk Monitor', value: currentLossStreak > 3 ? 'EXTREME' : 'OPTIMIZED', icon: Activity, color: currentLossStreak > 3 ? 'text-destructive' : 'text-accent', bg: currentLossStreak > 3 ? 'bg-destructive/10' : 'bg-accent/10' },
           ].map((stat, i) => (
             <Card key={i} className="border-white/5 bg-white/5 rounded-2xl">
               <CardContent className="p-4 flex items-center gap-3">
@@ -349,24 +370,24 @@ export default function SicboOracle() {
               {loadingAI && (
                 <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-20 flex flex-col items-center justify-center space-y-4">
                   <Zap className="text-primary animate-pulse" size={48} />
-                  <p className="text-[10px] font-black uppercase tracking-[0.5em] text-primary">Neural AI Scanning Patterns...</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.5em] text-primary">Neural Pattern Recognition...</p>
                 </div>
               )}
               <CardHeader className="flex flex-row items-center justify-between border-b border-white/5 bg-white/2 px-6 py-4">
                 <CardTitle className="text-[10px] font-black text-white uppercase flex items-center gap-2 tracking-[0.2em]">
-                  <Target size={14} className="text-primary" /> Prediction Engine
+                  <Target size={14} className="text-primary" /> Prediction Oracle
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Button onClick={simulateRoll} variant="ghost" size="sm" className="h-7 text-[8px] font-black uppercase tracking-widest text-white/40 hover:text-primary">
-                    AI Simulate
+                    Force AI Roll
                   </Button>
-                  <Badge className="bg-accent text-white text-[8px] px-2 py-0.5 font-black">ONLINE</Badge>
+                  <Badge className="bg-accent text-white text-[8px] px-2 py-0.5 font-black">ACTIVE</Badge>
                 </div>
               </CardHeader>
               <CardContent className="p-6 sm:p-10 space-y-8">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-8">
                   <div className="text-center md:text-left">
-                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-2">Next Outcome</p>
+                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-2">Next Predicted Outcome</p>
                     <h2 className={cn("text-7xl sm:text-9xl font-black tracking-tighter italic transition-all duration-500", 
                       prediction?.predictedSize === 'BIG' ? 'text-primary drop-shadow-[0_0_30px_rgba(139,92,246,0.3)]' : 
                       prediction?.predictedSize === 'SMALL' ? 'text-accent drop-shadow-[0_0_30px_rgba(13,148,136,0.3)]' : 'text-white/5'
@@ -375,15 +396,15 @@ export default function SicboOracle() {
                     </h2>
                     <div className="flex items-center justify-center md:justify-start gap-3 mt-4">
                       <Badge variant="outline" className="border-white/10 text-white font-black uppercase px-3 py-0.5 text-[10px]">{prediction?.predictedParity || 'WAITING'}</Badge>
-                      <span className="text-[10px] font-black text-primary uppercase tracking-widest">Conf: {prediction?.confidence || 0}%</span>
+                      <span className="text-[10px] font-black text-primary uppercase tracking-widest">Confidence: {prediction?.confidence || 0}%</span>
                     </div>
                   </div>
 
                   <div className="bg-white/5 p-6 sm:p-8 rounded-2xl border border-white/10 w-full md:w-auto text-center md:text-right">
-                    <p className="text-[9px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Suggested Bet</p>
+                    <p className="text-[9px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Suggested Stake</p>
                     <p className="text-3xl sm:text-4xl font-black text-white">{formatIDR(suggestedBet)}</p>
                     <div className="mt-3 flex items-center justify-center md:justify-end gap-2">
-                       <Badge className="bg-primary/20 text-primary text-[9px] font-black px-2 uppercase tracking-tighter">Level {betLevel + 1}</Badge>
+                       <Badge className="bg-primary/20 text-primary text-[9px] font-black px-2 uppercase tracking-tighter">Martingale Level {betLevel + 1}</Badge>
                        <Badge className="bg-white/10 text-white text-[9px] font-black px-2">X{MULTIPLIERS[betLevel].multiplier}</Badge>
                     </div>
                   </div>
@@ -391,7 +412,7 @@ export default function SicboOracle() {
 
                 <div className="bg-white/2 rounded-xl p-5 border-l-4 border-primary relative overflow-hidden">
                   <p className="text-xs sm:text-sm text-white/80 font-medium italic leading-relaxed">
-                    "{prediction?.reason || "Input minimal 3 data histori untuk mengaktifkan AI Oracle."}"
+                    "{prediction?.reason || "Input data di panel kanan untuk memicu prediksi AI Oracle."}"
                   </p>
                 </div>
               </CardContent>
@@ -404,7 +425,7 @@ export default function SicboOracle() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-black text-lg text-white italic tracking-tight uppercase flex items-center gap-2">
-                       <Dices size={20} className="text-amber-500" /> Leopard Opportunity
+                       <Dices size={20} className="text-amber-500" /> Leopard Probability
                     </h3>
                     {leopardStatus?.recommendation && (
                       <Badge className={cn("text-[9px] font-black", 
@@ -414,37 +435,37 @@ export default function SicboOracle() {
                   </div>
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <div className="bg-black/40 rounded-xl p-4 border border-white/5 text-center">
-                      <p className="text-[8px] text-muted-foreground font-black uppercase mb-1">Interval</p>
+                      <p className="text-[8px] text-muted-foreground font-black uppercase mb-1">Last Leopard</p>
                       <p className="text-2xl font-black text-white">{leopardStatus?.rollsSinceLastLeopard ?? '0'}</p>
                     </div>
                     <div className="bg-black/40 rounded-xl p-4 border border-white/5 text-center flex flex-col justify-center">
-                      <p className="text-[8px] text-muted-foreground font-black uppercase mb-1">Sleeper Status</p>
+                      <p className="text-[8px] text-muted-foreground font-black uppercase mb-1">Signal Status</p>
                       <p className={cn("text-[10px] font-black uppercase italic", leopardStatus?.isLeopardOpportunity ? 'text-amber-500 animate-pulse' : 'text-white/20')}>
-                        {leopardStatus?.isLeopardOpportunity ? 'HOT' : 'COLD'}
+                        {leopardStatus?.isLeopardOpportunity ? 'CRITICAL HOT' : 'DORMANT'}
                       </p>
                     </div>
                   </div>
                   <p className="text-[10px] text-white/50 italic leading-snug">
-                    {leopardStatus?.reasoning || "Menunggu data untuk analisis anomali triple..."}
+                    {leopardStatus?.reasoning || "Menunggu data histori untuk analisis anomali Triple..."}
                   </p>
                 </CardContent>
               </Card>
 
               <Card className="border-white/5 bg-white/2 rounded-2xl p-6">
                 <h3 className="font-black text-lg text-white italic tracking-tight uppercase mb-4 flex items-center gap-2">
-                  <Flame size={20} className="text-red-500" /> Hot Summary
+                  <Flame size={20} className="text-red-500" /> Pattern Summary
                 </h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-[11px] font-bold">
-                    <span className="text-muted-foreground">SIZE PREDICTION</span>
+                    <span className="text-muted-foreground">PREDICTED SIZE</span>
                     <span className="text-white bg-primary/20 px-2 py-0.5 rounded-md">{prediction?.predictedSize || '---'}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] font-bold">
-                    <span className="text-muted-foreground">PARITY PREDICTION</span>
+                    <span className="text-muted-foreground">PREDICTED PARITY</span>
                     <span className="text-white bg-accent/20 px-2 py-0.5 rounded-md">{prediction?.predictedParity || '---'}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] font-bold border-t border-white/5 pt-2">
-                    <span className="text-primary uppercase">NEXT RECOVERY</span>
+                    <span className="text-primary uppercase">NEXT STAKE</span>
                     <span className="text-white font-black">{formatIDR(suggestedBet)}</span>
                   </div>
                 </div>
@@ -453,10 +474,10 @@ export default function SicboOracle() {
           </div>
 
           <div className="lg:col-span-4 space-y-6">
-            <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl overflow-hidden">
+            <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl overflow-hidden shadow-xl">
               <CardHeader className="bg-white/2 px-6 py-4">
                 <CardTitle className="text-[9px] font-black uppercase text-white tracking-widest">
-                  Manual Input Sensor
+                  Manual Dice Input
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-6">
@@ -483,16 +504,16 @@ export default function SicboOracle() {
               </CardContent>
             </Card>
 
-            <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl">
+            <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl shadow-xl">
               <CardHeader className="px-6 py-4 border-b border-white/5">
                 <CardTitle className="text-[9px] font-black uppercase text-white tracking-widest flex items-center gap-2">
-                  <Settings2 size={14} /> Configuration
+                  <Settings2 size={14} /> Bankroll Strategy
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-5">
                 <div className="space-y-2">
                   <label className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-1">
-                    <Wallet size={10}/> Initial Capital (IDR)
+                    <Wallet size={10}/> Initial Bankroll (IDR)
                   </label>
                   <Input 
                     type="number" 
@@ -504,7 +525,7 @@ export default function SicboOracle() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-1">
-                    <Bomb size={10}/> Base Bet Unit (IDR)
+                    <Bomb size={10}/> Base Unit Stake (IDR)
                   </label>
                   <Input 
                     type="number" 
@@ -535,7 +556,7 @@ export default function SicboOracle() {
           <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl overflow-hidden shadow-2xl">
             <CardHeader className="bg-white/2 p-5 border-b border-white/5">
               <CardTitle className="text-[9px] font-black uppercase text-white tracking-[0.3em] flex items-center gap-2">
-                <BarChart3 size={16} /> Cloud Audit Log
+                <BarChart3 size={16} /> Cloud Audit & AI Accuracy Log
               </CardTitle>
             </CardHeader>
             <div className="overflow-x-auto">
@@ -545,8 +566,8 @@ export default function SicboOracle() {
                     <th className="p-4 text-left pl-8">Pattern</th>
                     <th className="p-4">Sum</th>
                     <th className="p-4">Result</th>
-                    <th className="p-4">Oracle Check</th>
-                    <th className="p-4 text-right pr-8">Bankroll</th>
+                    <th className="p-4">Accuracy (Size/Parity)</th>
+                    <th className="p-4 text-right pr-8">Live Bankroll</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -565,7 +586,7 @@ export default function SicboOracle() {
                       <td className="p-4">
                          <div className="flex flex-col items-center gap-1">
                             <span className={cn("font-black px-3 py-1 rounded-full text-[9px] uppercase tracking-wider", 
-                              row.isLeopard ? 'bg-amber-500 text-black' : 
+                              row.isLeopard ? 'bg-amber-500 text-black shadow-[0_0_10px_rgba(245,158,11,0.4)]' : 
                               row.isBig ? 'bg-primary/20 text-primary' : 'bg-accent/20 text-accent'
                             )}>
                               {row.isLeopard ? 'TRIPLE' : row.isBig ? 'BIG' : 'SMALL'}
@@ -591,8 +612,8 @@ export default function SicboOracle() {
                       <td className="p-4 text-right pr-8">
                          <div className="flex flex-col items-end">
                             <span className="font-black text-white text-[12px]">{formatIDR(row.currentBalance)}</span>
-                            <span className={cn("text-[8px] font-black mt-1", row.isCorrectSize ? 'text-accent' : 'text-destructive')}>
-                               {row.isCorrectSize ? '+' : '-'}{formatIDR(row.betAmount)}
+                            <span className={cn("text-[8px] font-black mt-1 uppercase", row.isCorrectSize ? 'text-accent' : 'text-destructive')}>
+                               {row.isCorrectSize ? `+${formatIDR(row.betAmount)}` : `-${formatIDR(row.betAmount)}`}
                             </span>
                          </div>
                       </td>
@@ -608,14 +629,14 @@ export default function SicboOracle() {
       <Dialog open={showResetModal} onOpenChange={setShowResetModal}>
         <DialogContent className="bg-[#0a0a0a] border-white/10 rounded-2xl max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-xl font-black text-destructive uppercase italic">Purge Cloud Data?</DialogTitle>
+            <DialogTitle className="text-xl font-black text-destructive uppercase italic">Wipe Cloud Data?</DialogTitle>
             <DialogDescription className="text-muted-foreground pt-3 text-xs">
-              Seluruh histori di Supabase akan dihapus permanen. Saldo akan kembali ke modal awal.
+              Seluruh histori di Cloud Supabase akan dihapus permanen. Bankroll akan di-reset ke modal awal.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-6 gap-2">
-            <Button variant="secondary" onClick={() => setShowResetModal(false)} className="rounded-xl h-10 px-4 text-[10px] font-black uppercase">Cancel</Button>
-            <Button variant="destructive" onClick={resetAll} className="rounded-xl h-10 px-4 text-[10px] font-black uppercase tracking-widest">Wipe Data</Button>
+            <Button variant="secondary" onClick={() => setShowResetModal(false)} className="rounded-xl h-10 px-4 text-[10px] font-black uppercase">Batal</Button>
+            <Button variant="destructive" onClick={resetAll} className="rounded-xl h-10 px-4 text-[10px] font-black uppercase tracking-widest">Hapus Semua</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
