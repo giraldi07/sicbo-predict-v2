@@ -47,11 +47,14 @@ const MULTIPLIERS = [
   { level: 6, multiplier: 216, text: "Level 6 (Max Recovery)" }
 ];
 
+const INITIAL_BALANCE = 1000000;
+const INITIAL_BASE_BET = 10000;
+
 export default function SicboOracle() {
   const [history, setHistory] = useState<any[]>([]);
   const [currentRoll, setCurrentRoll] = useState<number[]>([]);
-  const [balance, setBalance] = useState(10000);
-  const [baseBet, setBaseBet] = useState(100);
+  const [balance, setBalance] = useState(INITIAL_BALANCE);
+  const [baseBet, setBaseBet] = useState(INITIAL_BASE_BET);
   const [showResetModal, setShowResetModal] = useState(false);
   const [loadingAI, setLoadingAI] = useState(false);
   
@@ -62,10 +65,9 @@ export default function SicboOracle() {
   const stats = useMemo(() => {
     if (history.length === 0) return { winRate: 0, profit: 0, totalGames: 0 };
     const correctCount = history.filter(h => h.isCorrectSize).length;
-    const initialBalance = 10000; // Simplified for MVP
     return {
       winRate: Math.round((correctCount / history.length) * 100),
-      profit: balance - initialBalance,
+      profit: balance - INITIAL_BALANCE,
       totalGames: history.length
     };
   }, [history, balance]);
@@ -172,10 +174,19 @@ export default function SicboOracle() {
 
   const resetAll = () => {
     setHistory([]);
-    setBalance(10000);
+    setBalance(INITIAL_BALANCE);
     setPrediction(null);
     setLeopardStatus(null);
     setShowResetModal(false);
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
   };
 
   return (
@@ -199,8 +210,8 @@ export default function SicboOracle() {
             <div className="bg-card border border-border rounded-lg px-4 py-2 flex items-center gap-3 shadow-sm">
               <Wallet className="text-accent" size={18} />
               <div>
-                <p className="text-[10px] text-muted-foreground uppercase font-bold">Bankroll</p>
-                <p className="text-sm font-black text-white">${balance.toLocaleString()}</p>
+                <p className="text-[10px] text-muted-foreground uppercase font-bold">Saldo</p>
+                <p className="text-sm font-black text-white">{formatCurrency(balance)}</p>
               </div>
             </div>
             <Button variant="outline" size="icon" onClick={() => setShowResetModal(true)} className="border-destructive/20 hover:bg-destructive/10">
@@ -213,7 +224,7 @@ export default function SicboOracle() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { label: 'Win Rate', value: `${stats.winRate}%`, icon: Trophy, color: 'text-accent' },
-            { label: 'Profit', value: `$${stats.profit.toLocaleString()}`, icon: TrendingUp, color: stats.profit >= 0 ? 'text-accent' : 'text-destructive' },
+            { label: 'Profit', value: formatCurrency(stats.profit), icon: TrendingUp, color: stats.profit >= 0 ? 'text-accent' : 'text-destructive' },
             { label: 'Total Rolls', value: stats.totalGames, icon: HistoryIcon, color: 'text-primary' },
             { label: 'Loss Streak', value: currentLossStreak, icon: AlertTriangle, color: 'text-destructive' },
           ].map((stat, i) => (
@@ -256,8 +267,8 @@ export default function SicboOracle() {
                     <p className="text-sm font-bold text-muted-foreground mt-2">PARITY: <span className="text-white">{prediction?.predictedParity || '---'}</span></p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Recommended Bet</p>
-                    <p className="text-3xl font-black text-accent">${suggestedBet.toLocaleString()}</p>
+                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Rekomendasi Bet</p>
+                    <p className="text-2xl font-black text-accent">{formatCurrency(suggestedBet)}</p>
                     <Badge variant="outline" className="mt-1 border-accent/20 text-accent text-[10px]">
                       {MULTIPLIERS[betLevel].text}
                     </Badge>
@@ -345,7 +356,7 @@ export default function SicboOracle() {
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Base Bet Amount</label>
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground font-bold">$</span>
+                    <span className="text-muted-foreground font-bold">Rp</span>
                     <Input 
                       type="number" 
                       value={baseBet} 
@@ -406,7 +417,7 @@ export default function SicboOracle() {
                       <td className="p-3">
                         <span className={row.isOdd ? 'text-purple-400' : 'text-teal-400'}>{row.isOdd ? 'Odd' : 'Even'}</span>
                       </td>
-                      <td className="p-3 text-muted-foreground">${row.betAmount}</td>
+                      <td className="p-3 text-muted-foreground">{formatCurrency(row.betAmount)}</td>
                       <td className="p-3">
                         {row.isCorrectSize !== null ? (
                           row.isCorrectSize ? (
@@ -435,7 +446,7 @@ export default function SicboOracle() {
               <AlertTriangle /> WARNING: System Reset
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              This will clear all game history, reset your bankroll to $10,000, and wipe the AI's current pattern training. This action cannot be undone.
+              This will clear all game history, reset your bankroll to {formatCurrency(INITIAL_BALANCE)}, and wipe the AI's current pattern training. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
