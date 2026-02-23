@@ -64,10 +64,9 @@ export default function SicboOracle() {
   const [prediction, setPrediction] = useState<PredictSicBoOutcomeOutput | null>(null);
   const [leopardStatus, setLeopardStatus] = useState<PredictLeopardOpportunityOutput | null>(null);
 
-  // Hitung statistik berdasarkan history
   const stats = useMemo(() => {
     if (history.length === 0) return { winRate: 0, profit: 0, totalGames: 0 };
-    const correctCount = history.filter(h => h.isCorrectSize).length;
+    const correctCount = history.filter(h => h.isCorrectSize === true).length;
     return {
       winRate: Math.round((correctCount / history.length) * 100),
       profit: balance - INITIAL_BALANCE,
@@ -75,7 +74,6 @@ export default function SicboOracle() {
     };
   }, [history, balance]);
 
-  // Hitung streak kekalahan untuk menentukan level Martingale
   const currentLossStreak = useMemo(() => {
     let streak = 0;
     for (const roll of history) {
@@ -88,9 +86,8 @@ export default function SicboOracle() {
   const betLevel = Math.min(currentLossStreak, MULTIPLIERS.length - 1);
   const suggestedBet = baseBet * MULTIPLIERS[betLevel].multiplier;
 
-  // AI Prediction Trigger
   const updatePredictions = useCallback(async (currentHistory: any[]) => {
-    if (currentHistory.length < 3) return; // Butuh minimal 3 data untuk pola dasar
+    if (currentHistory.length < 3) return;
     
     setLoadingAI(true);
     try {
@@ -110,11 +107,6 @@ export default function SicboOracle() {
       setLeopardStatus(leopard);
     } catch (error) {
       console.error("AI Error:", error);
-      toast({
-        variant: "destructive",
-        title: "Koneksi AI Terputus",
-        description: "Gagal mendapatkan prediksi terbaru dari Oracle."
-      });
     } finally {
       setLoadingAI(false);
     }
@@ -127,20 +119,17 @@ export default function SicboOracle() {
     const isLeopard = roll[0] === roll[1] && roll[1] === roll[2];
 
     const predictedSize = prediction?.predictedSize;
-    const predictedParity = prediction?.predictedParity;
     
     const isCorrectSize = predictedSize ? (isBig ? 'BIG' : 'SMALL') === predictedSize : null;
-    const isCorrectParity = predictedParity ? (isOdd ? 'ODD' : 'EVEN') === predictedParity : null;
 
-    // Update Saldo (Hanya jika ada prediksi aktif)
     let newBalance = balance;
     if (isCorrectSize !== null) {
       if (isCorrectSize) {
         newBalance += suggestedBet;
-        toast({ title: "Menang!", description: `Profit: +Rp ${suggestedBet.toLocaleString()}` });
+        toast({ title: "🎯 Prediksi Tepat!", description: `Profit: +Rp ${suggestedBet.toLocaleString()}` });
       } else {
         newBalance -= suggestedBet;
-        toast({ variant: "destructive", title: "Kalah", description: `Rugi: -Rp ${suggestedBet.toLocaleString()}` });
+        toast({ variant: "destructive", title: "❌ Meleset", description: `Kerugian: -Rp ${suggestedBet.toLocaleString()}` });
       }
     }
 
@@ -153,7 +142,6 @@ export default function SicboOracle() {
       isOdd,
       isLeopard,
       isCorrectSize,
-      isCorrectParity,
       betAmount: suggestedBet,
       currentBalance: newBalance
     };
@@ -190,9 +178,12 @@ export default function SicboOracle() {
     } else if (history.length > 0) {
       const removed = history[0];
       setHistory(prev => prev.slice(1));
-      if (removed.isCorrectSize !== null) {
-        setBalance(prev => removed.isCorrectSize ? prev - removed.betAmount : prev + removed.betAmount);
-      }
+      setBalance(prev => {
+        if (removed.isCorrectSize === true) return prev - removed.betAmount;
+        if (removed.isCorrectSize === false) return prev + removed.betAmount;
+        return prev;
+      });
+      toast({ title: "Undo Berhasil", description: "Langkah terakhir telah dibatalkan." });
     }
   };
 
@@ -201,7 +192,12 @@ export default function SicboOracle() {
     setBalance(INITIAL_BALANCE);
     setPrediction(null);
     setLeopardStatus(null);
+    setCurrentRoll([]);
     setShowResetModal(false);
+    toast({ 
+      title: "Data Dihapus", 
+      description: "Seluruh histori dan saldo telah dikembalikan ke kondisi awal." 
+    });
   };
 
   const formatCurrency = (value: number) => {
@@ -269,7 +265,7 @@ export default function SicboOracle() {
         {/* Main Interface Grid */}
         <div className="grid lg:grid-cols-12 gap-6">
           
-          {/* Prediction Panel (Left/Center) */}
+          {/* Prediction Panel */}
           <div className="lg:col-span-8 space-y-6">
             <Card className="border-primary/30 bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] overflow-hidden relative shadow-2xl">
               <div className="absolute top-0 right-0 p-6 flex gap-2">
@@ -298,11 +294,11 @@ export default function SicboOracle() {
                     </h2>
                     <div className="flex items-center gap-3">
                       <Badge className="bg-white/10 text-white border-none font-bold">PARITY: {prediction?.predictedParity || '---'}</Badge>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Tingkat Kepercayaan: 84%</span>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase">AI Confidence: 84%</span>
                     </div>
                   </div>
                   <div className="text-left md:text-right bg-white/5 p-4 rounded-2xl border border-white/5 backdrop-blur-md">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Rekomendasi Betting</p>
+                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Saran Taruhan</p>
                     <p className="text-3xl font-black text-accent">{formatCurrency(suggestedBet)}</p>
                     <div className="mt-2 flex items-center justify-end gap-2">
                       <Badge variant="outline" className="border-accent/30 text-accent text-[9px] font-black uppercase tracking-tighter">
@@ -315,7 +311,7 @@ export default function SicboOracle() {
                 <div className="bg-primary/5 rounded-2xl p-5 border border-primary/10 relative overflow-hidden group">
                   <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
                   <p className="text-xs text-white/80 leading-relaxed italic font-medium">
-                    "{prediction?.reason || "Membutuhkan minimal 3 data histori untuk mulai membaca anomali dan pola dadu."}"
+                    "{prediction?.reason || "Input minimal 3 hasil manual atau gunakan tombol 'Simulasi Roll' untuk memulai analisis pola."}"
                   </p>
                 </div>
               </CardContent>
@@ -335,7 +331,7 @@ export default function SicboOracle() {
                     </div>
                   </div>
                   {leopardStatus?.isLeopardOpportunity && (
-                    <Badge className="bg-amber-500 text-white animate-bounce font-black px-4 py-1 rounded-full shadow-lg">PELUANG EMAS</Badge>
+                    <Badge className="bg-amber-500 text-white animate-bounce font-black px-4 py-1 rounded-full shadow-lg">PELUANG TINGGI</Badge>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-6 mb-6">
@@ -344,18 +340,18 @@ export default function SicboOracle() {
                     <p className="text-3xl font-black text-white tracking-tighter">{leopardStatus?.rollsSinceLastLeopard ?? '0'}</p>
                   </div>
                   <div className="bg-black/40 rounded-2xl p-4 border border-white/5 text-center">
-                    <p className="text-[10px] text-muted-foreground font-black uppercase mb-1">Ambang Batas Rata-rata</p>
+                    <p className="text-[10px] text-muted-foreground font-black uppercase mb-1">Threshold Rata-rata</p>
                     <p className="text-3xl font-black text-white/40 tracking-tighter">36</p>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground font-medium leading-relaxed bg-white/5 p-3 rounded-xl border border-white/5">
-                  {leopardStatus?.reasoning || "Menunggu data histori yang cukup untuk memetakan jendela probabilitas Leopard..."}
+                  {leopardStatus?.reasoning || "Menunggu data histori yang cukup untuk memetakan probabilitas Leopard..."}
                 </p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Input & Settings (Right) */}
+          {/* Sidebar */}
           <div className="lg:col-span-4 space-y-6">
             <Card className="border-white/10 bg-[#1a1a1a] shadow-xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
@@ -396,7 +392,7 @@ export default function SicboOracle() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Taruhan Dasar (Base)</label>
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Taruhan Dasar</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-black text-xs">Rp</span>
                     <Input 
@@ -423,7 +419,7 @@ export default function SicboOracle() {
           </div>
         </div>
 
-        {/* History Table */}
+        {/* History Log */}
         {history.length > 0 && (
           <Card className="border-white/10 bg-[#1a1a1a] overflow-hidden shadow-2xl">
             <CardHeader className="bg-white/2 p-5">
@@ -439,9 +435,8 @@ export default function SicboOracle() {
                     <th className="p-4">Dadu</th>
                     <th className="p-4">Poin</th>
                     <th className="p-4">Hasil</th>
-                    <th className="p-4">Parity</th>
                     <th className="p-4">Taruhan</th>
-                    <th className="p-4">Status AI</th>
+                    <th className="p-4">Akurasi AI</th>
                     <th className="p-4 text-right pr-8">Saldo Berjalan</th>
                   </tr>
                 </thead>
@@ -461,9 +456,6 @@ export default function SicboOracle() {
                         <Badge variant="outline" className={`border-none font-black ${row.isBig ? 'text-primary' : 'text-accent'}`}>
                           {row.isBig ? 'BIG' : 'SMALL'}
                         </Badge>
-                      </td>
-                      <td className="p-4">
-                        <span className={`font-bold ${row.isOdd ? 'text-purple-400' : 'text-teal-400'}`}>{row.isOdd ? 'ODD' : 'EVEN'}</span>
                       </td>
                       <td className="p-4 text-muted-foreground font-bold">{formatCurrency(row.betAmount)}</td>
                       <td className="p-4">
@@ -499,7 +491,7 @@ export default function SicboOracle() {
               <AlertTriangle className="animate-pulse" /> Konfirmasi Reset
             </DialogTitle>
             <DialogDescription className="text-muted-foreground font-medium pt-2">
-              Tindakan ini akan menghapus seluruh histori permainan, mengembalikan saldo ke {formatCurrency(INITIAL_BALANCE)}, dan menghapus memori pola AI saat ini. Apakah Anda yakin?
+              Tindakan ini akan menghapus seluruh histori permainan, mengembalikan saldo ke Rp 1.000.000, dan mereset memori analisis AI. Tindakan ini tidak dapat dibatalkan.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-3 mt-6">
@@ -511,4 +503,3 @@ export default function SicboOracle() {
     </div>
   );
 }
-
