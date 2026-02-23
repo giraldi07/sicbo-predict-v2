@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -19,7 +20,8 @@ import {
   Flame,
   Bomb,
   Activity,
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +35,7 @@ import {
   DialogDescription,
   DialogFooter
 } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   predictSicBoOutcome, 
   type PredictSicBoOutcomeOutput 
@@ -66,6 +69,7 @@ export default function SicboOracle() {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [history, setHistory] = useState<any[]>([]);
   const [currentRoll, setCurrentRoll] = useState<number[]>([]);
+  const [configError, setConfigError] = useState<string | null>(null);
   
   const [prediction, setPrediction] = useState<PredictSicBoOutcomeOutput | null>(null);
   const [leopardStatus, setLeopardStatus] = useState<PredictLeopardOpportunityOutput | null>(null);
@@ -79,10 +83,16 @@ export default function SicboOracle() {
         .order('createdAt', { ascending: false })
         .limit(50);
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes("Forbidden")) {
+          setConfigError("Kunci API yang Anda gunakan adalah 'Secret Key'. Harap ganti dengan 'Anon Public Key' di src/lib/supabase.ts agar dapat berjalan di browser.");
+        }
+        throw error;
+      }
       
       const gameHistory = data || [];
       setHistory(gameHistory);
+      setConfigError(null);
       
       if (gameHistory.length > 0) {
         setBalance(Number(gameHistory[0].currentBalance));
@@ -90,8 +100,7 @@ export default function SicboOracle() {
         setBalance(initialCapital);
       }
     } catch (err: any) {
-      console.error("Supabase Error Details:", err.message || err);
-      // Jangan tampilkan toast error jika tabel memang belum ada (saat inisialisasi)
+      console.error("Supabase Error:", err.message || err);
     } finally {
       setLoadingHistory(false);
     }
@@ -216,7 +225,7 @@ export default function SicboOracle() {
     
     if (error) {
       console.error("Supabase Insert Error:", error.message);
-      toast({ title: "Gagal menyimpan ke Cloud. Pastikan tabel sudah dibuat.", variant: "destructive" });
+      toast({ title: "Gagal menyimpan ke Cloud. Pastikan RLS diizinkan dan tabel sudah ada.", variant: "destructive" });
     } else {
       setBalance(newBalance);
       setCurrentRoll([]);
@@ -296,7 +305,17 @@ export default function SicboOracle() {
       </header>
 
       <main className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
-        {loadingHistory && (
+        {configError && (
+          <Alert variant="destructive" className="bg-destructive/10 border-destructive/50 rounded-2xl">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle className="font-black uppercase text-[10px] tracking-widest">Configuration Error</AlertTitle>
+            <AlertDescription className="text-xs font-medium pt-1">
+              {configError}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {loadingHistory && !configError && (
           <div className="flex items-center justify-center p-12 gap-3 text-primary">
             <Loader2 className="animate-spin" />
             <span className="text-[10px] font-black uppercase tracking-widest">Sinkronisasi Cloud...</span>
