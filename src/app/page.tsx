@@ -22,7 +22,8 @@ import {
   Activity,
   Loader2,
   AlertCircle,
-  Database
+  Database,
+  Lock
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -70,12 +71,23 @@ export default function SicboOracle() {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [history, setHistory] = useState<any[]>([]);
   const [currentRoll, setCurrentRoll] = useState<number[]>([]);
-  const [configError, setConfigError] = useState<{title: string, msg: string} | null>(null);
+  const [configError, setConfigError] = useState<{title: string, msg: string, isKeyMissing?: boolean} | null>(null);
   
   const [prediction, setPrediction] = useState<PredictSicBoOutcomeOutput | null>(null);
   const [leopardStatus, setLeopardStatus] = useState<PredictLeopardOpportunityOutput | null>(null);
 
   const fetchHistory = useCallback(async () => {
+    // Check if key is missing first
+    if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === undefined || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === '') {
+      setConfigError({
+        title: "Konfigurasi Belum Lengkap",
+        msg: "Anda harus menambahkan NEXT_PUBLIC_SUPABASE_ANON_KEY di Dashboard Vercel (Environment Variables).",
+        isKeyMissing: true
+      });
+      setLoadingHistory(false);
+      return;
+    }
+
     setLoadingHistory(true);
     try {
       const { data, error } = await supabase
@@ -107,7 +119,6 @@ export default function SicboOracle() {
       
       if (gameHistory.length > 0) {
         setBalance(Number(gameHistory[0].currentBalance));
-        setInitialCapital(Number(gameHistory[gameHistory.length - 1].currentBalance) - (gameHistory[gameHistory.length - 1].isCorrectSize ? gameHistory[gameHistory.length - 1].betAmount : -gameHistory[gameHistory.length - 1].betAmount));
       } else {
         setBalance(initialCapital);
       }
@@ -286,7 +297,7 @@ export default function SicboOracle() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-foreground pb-20">
-      <header className="sticky top-0 z-[100] bg-[#050505]/90 backdrop-blur-2xl border-b border-white/5 py-4 px-4 md:px-8">
+      <header className="sticky top-0 z-[100] bg-[#050505]/95 backdrop-blur-md border-b border-white/5 py-4 px-4 md:px-8 shadow-2xl">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 rotate-3">
@@ -323,14 +334,14 @@ export default function SicboOracle() {
       <main className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
         {configError && (
           <Alert variant="destructive" className="bg-destructive/10 border-destructive/50 rounded-2xl animate-in fade-in slide-in-from-top-4 duration-500">
-            <AlertCircle className="h-5 w-5" />
+            {configError.isKeyMissing ? <Lock className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
             <AlertTitle className="font-black uppercase text-xs tracking-widest">{configError.title}</AlertTitle>
             <AlertDescription className="text-xs font-medium pt-1">
               {configError.msg}
             </AlertDescription>
             <div className="mt-4 flex gap-2">
               <Button size="sm" variant="outline" className="text-[9px] font-black uppercase h-7 border-destructive/30" onClick={() => fetchHistory()}>
-                Coba Lagi
+                Coba Sinkron Ulang
               </Button>
             </div>
           </Alert>

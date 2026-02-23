@@ -1,9 +1,14 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://sxatydvrzqlrjdbutirz.supabase.co';
-// PERHATIAN: Gunakan "anon" "public" key (dimulai dengan eyJ...), BUKAN "service_role" atau "secret" key.
-// Anda bisa menemukannya di Supabase Dashboard > Settings > API.
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4YXR5ZHZyenFscmpkYnV0aXJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4MzMxMTMsImV4cCI6MjA4NzQwOTExM30.S7zPEbF85rAJ2rrJOi7moCtI7UOe3gyXX7kOMu-5bfU';
+// Gunakan Environment Variables untuk keamanan.
+// NEXT_PUBLIC_ agar bisa diakses di sisi browser.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://sxatydvrzqlrjdbutirz.supabase.co';
+// Gunakan fallback 'MISSING' agar createClient tidak melempar error fatal saat inisialisasi
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'MISSING_KEY';
+
+if (supabaseKey === 'MISSING_KEY') {
+  console.warn("PERINGATAN: NEXT_PUBLIC_SUPABASE_ANON_KEY tidak ditemukan di Environment Variables.");
+}
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
