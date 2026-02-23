@@ -1,7 +1,6 @@
-
 'use server';
 /**
- * @fileOverview This file defines a Genkit flow for predicting "ANY (Leopard)" opportunities.
+ * @fileOverview Leopard (Triple) Probability Analyzer.
  */
 
 import {ai} from '@/ai/genkit';
@@ -9,89 +8,93 @@ import {z} from 'genkit';
 
 const PredictLeopardOpportunityInputSchema = z.object({
   gameHistory: z.array(z.object({
-    dice: z.array(z.number().min(1).max(6)).length(3),
+    dice: z.array(z.number()),
   })),
 });
-export type PredictLeopardOpportunityInput = z.infer<typeof PredictLeopardOpportunityInputSchema>;
 
 const PredictLeopardOpportunityOutputSchema = z.object({
   isLeopardOpportunity: z.boolean(),
   reasoning: z.string(),
   rollsSinceLastLeopard: z.number(),
   totalLeopardsInHistory: z.number(),
-  averageExpectedRollsForLeopard: z.number(),
 });
+
+export type PredictLeopardOpportunityInput = z.infer<typeof PredictLeopardOpportunityInputSchema>;
 export type PredictLeopardOpportunityOutput = z.infer<typeof PredictLeopardOpportunityOutputSchema>;
 
-export async function predictLeopardOpportunity(input: PredictLeopardOpportunityInput): Promise<PredictLeopardOpportunityOutput> {
-  try {
-    return await predictLeopardOpportunityFlow(input);
-  } catch (error) {
-    console.error("Server Action Error Leopard:", error);
-    return {
-      isLeopardOpportunity: false,
-      reasoning: "Gagal memproses data Leopard.",
-      rollsSinceLastLeopard: 0,
-      totalLeopardsInHistory: 0,
-      averageExpectedRollsForLeopard: 36
-    };
-  }
-}
-
-function isLeopard(dice: number[]): boolean {
-  return dice.length === 3 && dice[0] === dice[1] && dice[1] === dice[2];
-}
-
-const leopardOpportunityPrompt = ai.definePrompt({
-  name: 'leopardOpportunityPrompt',
+const leopardPrompt = ai.definePrompt({
+  name: 'leopardPrompt',
   input: {
     schema: z.object({
+      rollsSinceLast: z.number(),
+      totalLeopards: z.number(),
       historyLength: z.number(),
-      rollsSinceLastLeopard: z.number(),
-      totalLeopardsInHistory: z.number(),
-      averageExpectedRollsForLeopard: z.number(),
     })
   },
   output: {schema: PredictLeopardOpportunityOutputSchema},
   config: {
     safetySettings: [
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
     ]
   },
-  prompt: `Analisa peluang Leopard.
-Data:
-- Total rolls: {{{historyLength}}}
-- Rolls sejak Leopard terakhir: {{{rollsSinceLastLeopard}}}
-- Total Leopard ditemukan: {{{totalLeopardsInHistory}}}
-- Rata-rata statistik: 36`
+  prompt: `Analisis probabilitas kemunculan Triple (Leopard) pada Sic Bo.
+Secara statistik murni, Triple muncul rata-rata 1 kali setiap 36 putaran (2.8%).
+
+DATA INPUT SAAT INI:
+- Putaran sejak Leopard terakhir: {{rollsSinceLast}}
+- Total Leopard dalam sejarah: {{totalLeopards}}
+- Total Histori Data: {{historyLength}}
+
+INSTRUKSI ANALISIS:
+1. Jika rollsSinceLast > 30, probabilitas meningkat secara signifikan (hukum rata-rata).
+2. Jika belum pernah muncul (rollsSinceLast == historyLength) dan historyLength > 40, beri sinyal bahaya (Strong Buy).
+3. Berikan alasan matematis yang meyakinkan.
+4. Set isLeopardOpportunity ke TRUE jika peluang di atas 60%.`
 });
 
-const predictLeopardOpportunityFlow = ai.defineFlow(
-  {
-    name: 'predictLeopardOpportunityFlow',
-    inputSchema: PredictLeopardOpportunityInputSchema,
-    outputSchema: PredictLeopardOpportunityOutputSchema,
-  },
-  async (input) => {
+export async function predictLeopardOpportunity(input: PredictLeopardOpportunityInput): Promise<PredictLeopardOpportunityOutput> {
+  try {
     const { gameHistory } = input;
-    let rollsSinceLastLeopard = 0;
-    let foundLeopard = false;
-    for (let i = 0; i < gameHistory.length; i++) {
-      if (isLeopard(gameHistory[i].dice)) {
-        foundLeopard = true;
-        break;
-      }
-      rollsSinceLastLeopard++;
-    }
-    if (!foundLeopard) rollsSinceLastLeopard = gameHistory.length;
-    const totalLeopardsInHistory = gameHistory.filter(entry => isLeopard(entry.dice)).length;
+    let totalLeopards = 0;
+    let rollsSinceLast = 0;
+    let foundAny = false;
 
-    const {output} = await leopardOpportunityPrompt({
-      historyLength: gameHistory.length,
-      rollsSinceLastLeopard,
-      totalLeopardsInHistory,
-      averageExpectedRollsForLeopard: 36,
+    for (let i = 0; i < gameHistory.length; i++) {
+      const d = gameHistory[i].dice;
+      const isL = d[0] === d[1] && d[1] === d[2];
+      
+      if (isL) {
+        totalLeopards++;
+        if (!foundAny) {
+          rollsSinceLast = i;
+          foundAny = true;
+        }
+      }
+    }
+
+    if (!foundAny) rollsSinceLast = gameHistory.length;
+
+    const {output} = await leopardPrompt({
+      rollsSinceLast,
+      totalLeopards,
+      historyLength: gameHistory.length
     });
-    return output!;
+    
+    return {
+      ...output!,
+      rollsSinceLastLeopard: rollsSinceLast,
+      totalLeopardsInHistory: totalLeopards
+    };
+  } catch (error) {
+    console.error("Leopard Flow Error:", error);
+    return {
+      isLeopardOpportunity: false,
+      reasoning: "Gagal menghitung pola Leopard secara AI. Menggunakan estimasi statistik lokal.",
+      rollsSinceLastLeopard: 0,
+      totalLeopardsInHistory: 0
+    };
   }
-);
+}
