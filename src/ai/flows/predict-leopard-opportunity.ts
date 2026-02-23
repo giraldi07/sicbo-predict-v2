@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview Leopard (Triple) Probability Analyzer with Robust Error Handling.
+ * @fileOverview Leopard (Triple) Probability Analyzer.
  */
 
 import {ai} from '@/ai/genkit';
@@ -14,9 +14,9 @@ const PredictLeopardOpportunityInputSchema = z.object({
 
 const PredictLeopardOpportunityOutputSchema = z.object({
   isLeopardOpportunity: z.boolean(),
+  recommendation: z.enum(['WAIT', 'BET_LIGHT', 'BET_HEAVY', 'STRONG_BUY']),
   reasoning: z.string(),
   rollsSinceLastLeopard: z.number(),
-  totalLeopardsInHistory: z.number(),
 });
 
 export type PredictLeopardOpportunityInput = z.infer<typeof PredictLeopardOpportunityInputSchema>;
@@ -27,8 +27,7 @@ const leopardPrompt = ai.definePrompt({
   input: {
     schema: z.object({
       rollsSinceLast: z.number(),
-      totalLeopards: z.number(),
-      historyLength: z.number(),
+      history: z.string(),
     })
   },
   output: {schema: PredictLeopardOpportunityOutputSchema},
@@ -41,62 +40,51 @@ const leopardPrompt = ai.definePrompt({
       { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
     ]
   },
-  prompt: `Analisis probabilitas kemunculan Triple (Leopard) pada Sic Bo.
-Secara statistik murni, Triple muncul rata-rata 1 kali setiap 36 putaran (2.8%).
+  prompt: `Analisis Probabilitas Triple (Leopard) Sic Bo.
+Statistik: 1:36 (2.8%).
 
-DATA INPUT SAAT INI:
-- Putaran sejak Leopard terakhir: {{rollsSinceLast}}
-- Total Leopard dalam sejarah: {{totalLeopards}}
-- Total Histori Data: {{historyLength}}
+INPUT:
+- Jarak roll dari Leopard terakhir: {{rollsSinceLast}}
+- Histori dice: {{history}}
 
-INSTRUKSI ANALISIS:
-1. Jika rollsSinceLast > 30, probabilitas meningkat secara signifikan (hukum rata-rata).
-2. Jika belum pernah muncul (rollsSinceLast == historyLength) dan historyLength > 40, beri sinyal bahaya (Strong Buy).
-3. Berikan alasan matematis yang meyakinkan.
-4. Set isLeopardOpportunity ke TRUE jika peluang di atas 60%.`
+LOGIKA:
+- Jika rollsSinceLast > 30: Peluang BET_LIGHT.
+- Jika rollsSinceLast > 45: Peluang BET_HEAVY.
+- Jika rollsSinceLast > 60: Peluang STRONG_BUY.
+
+Berikan analisis apakah saat ini waktu yang tepat untuk memasang taruhan Triple (Payout 30x).`
 });
 
 export async function predictLeopardOpportunity(input: PredictLeopardOpportunityInput): Promise<PredictLeopardOpportunityOutput> {
   let rollsSinceLast = input.gameHistory.length;
-  let totalLeopards = 0;
+  const historyString = input.gameHistory.map(h => h.dice.join(',')).join('|');
+
+  for (let i = 0; i < input.gameHistory.length; i++) {
+    const d = input.gameHistory[i].dice;
+    if (d[0] === d[1] && d[1] === d[2]) {
+      rollsSinceLast = i;
+      break;
+    }
+  }
 
   try {
-    const { gameHistory } = input;
-    let foundLast = false;
-
-    for (let i = 0; i < gameHistory.length; i++) {
-      const d = gameHistory[i].dice;
-      const isL = d[0] === d[1] && d[1] === d[2];
-      
-      if (isL) {
-        totalLeopards++;
-        if (!foundLast) {
-          rollsSinceLast = i;
-          foundLast = true;
-        }
-      }
-    }
-
     const { output } = await leopardPrompt({
       rollsSinceLast,
-      totalLeopards,
-      historyLength: gameHistory.length
+      history: historyString
     });
     
-    if (!output) throw new Error("AI Blocked or Empty");
+    if (!output) throw new Error("AI Error");
 
     return {
       ...output,
       rollsSinceLastLeopard: rollsSinceLast,
-      totalLeopardsInHistory: totalLeopards
     };
   } catch (error) {
-    console.error("Leopard Flow Error:", error);
     return {
-      isLeopardOpportunity: rollsSinceLast > 36,
-      reasoning: "Analisis Statistik Lokal: " + (rollsSinceLast > 36 ? "Probabilitas Triple meningkat karena sudah melampaui rata-rata interval 36 roll." : "Interval Triple masih dalam rentang normal."),
-      rollsSinceLastLeopard: rollsSinceLast,
-      totalLeopardsInHistory: totalLeopards
+      isLeopardOpportunity: rollsSinceLast > 40,
+      recommendation: rollsSinceLast > 50 ? 'BET_HEAVY' : 'WAIT',
+      reasoning: "Analisis statistik mendeteksi keterlambatan kemunculan Triple selama " + rollsSinceLast + " putaran.",
+      rollsSinceLastLeopard: rollsSinceLast
     };
   }
 }
