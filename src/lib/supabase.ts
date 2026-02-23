@@ -1,14 +1,14 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Gunakan Environment Variables untuk keamanan.
-// NEXT_PUBLIC_ agar bisa diakses di sisi browser.
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://sxatydvrzqlrjdbutirz.supabase.co';
-// Gunakan fallback 'MISSING' agar createClient tidak melempar error fatal saat inisialisasi
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'MISSING_KEY';
+// Menggunakan Environment Variables untuk keamanan total.
+// Variabel NEXT_PUBLIC_ memungkinkan akses di sisi browser tanpa membocorkan Secret Key.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-if (supabaseKey === 'MISSING_KEY') {
-  console.warn("PERINGATAN: NEXT_PUBLIC_SUPABASE_ANON_KEY tidak ditemukan di Environment Variables.");
-}
-
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// Inisialisasi client. Jika key kosong, client akan dibuat dengan string kosong 
+// agar aplikasi tidak crash seketika, namun error akan ditangani di UI.
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co', 
+  supabaseKey || 'missing-key'
+);

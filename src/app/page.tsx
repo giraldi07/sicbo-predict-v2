@@ -77,11 +77,14 @@ export default function SicboOracle() {
   const [leopardStatus, setLeopardStatus] = useState<PredictLeopardOpportunityOutput | null>(null);
 
   const fetchHistory = useCallback(async () => {
-    // Check if key is missing first
-    if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === undefined || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === '') {
+    // Validasi apakah key sudah disetel di environment variables
+    const hasUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const hasKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== 'missing-key';
+
+    if (!hasUrl || !hasKey) {
       setConfigError({
-        title: "Konfigurasi Belum Lengkap",
-        msg: "Anda harus menambahkan NEXT_PUBLIC_SUPABASE_ANON_KEY di Dashboard Vercel (Environment Variables).",
+        title: "Konfigurasi Cloud Belum Aktif",
+        msg: "Harap masukkan NEXT_PUBLIC_SUPABASE_URL dan NEXT_PUBLIC_SUPABASE_ANON_KEY di Dashboard Vercel (Environment Variables).",
         isKeyMissing: true
       });
       setLoadingHistory(false);
@@ -100,15 +103,10 @@ export default function SicboOracle() {
         if (error.message.includes("violates row-level security")) {
           setConfigError({
             title: "Security Policy (RLS) Error",
-            msg: "Silakan jalankan SQL 'CREATE POLICY' di Dashboard Supabase agar browser bisa mengakses data."
-          });
-        } else if (error.message.includes("relation \"game_history\" does not exist")) {
-          setConfigError({
-            title: "Table Not Found",
-            msg: "Tabel 'game_history' belum ada. Silakan buat tabel menggunakan SQL Editor di Supabase."
+            msg: "Harap jalankan perintah SQL 'CREATE POLICY' di Supabase SQL Editor agar aplikasi dapat mengakses data."
           });
         } else {
-          console.error("Fetch Error:", error);
+          console.error("Supabase Error:", error.message);
         }
         return;
       }
@@ -123,7 +121,7 @@ export default function SicboOracle() {
         setBalance(initialCapital);
       }
     } catch (err: any) {
-      console.error("Supabase Error:", err.message || err);
+      console.error("System Error:", err.message || err);
     } finally {
       setLoadingHistory(false);
     }
@@ -189,7 +187,7 @@ export default function SicboOracle() {
       if (pred) setPrediction(pred);
       if (leopard) setLeopardStatus(leopard);
     } catch (error) {
-      console.error("AI Failure:", error);
+      console.error("AI Analysis Failed:", error);
     } finally {
       setLoadingAI(false);
     }
@@ -247,12 +245,8 @@ export default function SicboOracle() {
     const { error } = await supabase.from('game_history').insert([newEntry]);
     
     if (error) {
-      console.error("Supabase Insert Error:", error.message);
-      if (error.message.includes("violates row-level security")) {
-        toast({ title: "Gagal: RLS Policy Aktif. Jalankan SQL Policy di Supabase.", variant: "destructive" });
-      } else {
-        toast({ title: "Gagal menyimpan ke Cloud.", variant: "destructive" });
-      }
+      console.error("Cloud Storage Error:", error.message);
+      toast({ title: "Gagal menyimpan data ke Cloud.", variant: "destructive" });
     } else {
       setBalance(newBalance);
       setCurrentRoll([]);
@@ -275,7 +269,6 @@ export default function SicboOracle() {
   const resetAll = async () => {
     try {
       const { error } = await supabase.from('game_history').delete().neq('total', -1);
-      
       if (error) throw error;
 
       setBalance(initialCapital);
