@@ -77,7 +77,6 @@ export default function SicboOracle() {
   const [loadingAI, setLoadingAI] = useState(false);
   const [currentRoll, setCurrentRoll] = useState<number[]>([]);
   
-  // Fetch history from Firestore
   const historyQuery = useMemo(() => {
     if (!db) return null;
     return query(collection(db, 'game_history'), orderBy('createdAt', 'desc'), limit(50));
@@ -88,7 +87,6 @@ export default function SicboOracle() {
   const [prediction, setPrediction] = useState<PredictSicBoOutcomeOutput | null>(null);
   const [leopardStatus, setLeopardStatus] = useState<PredictLeopardOpportunityOutput | null>(null);
 
-  // Sync balance with last entry in Firestore or initialCapital
   useEffect(() => {
     if (!loadingHistory) {
       if (history.length > 0) {
@@ -146,7 +144,6 @@ export default function SicboOracle() {
     }
   }, []);
 
-  // Update AI when history changes
   useEffect(() => {
     if (history.length > 0) {
       updatePredictions(history);
@@ -289,7 +286,6 @@ export default function SicboOracle() {
           </div>
         )}
 
-        {/* Quick Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: 'Oracle Winrate', value: `${stats.winRate}%`, icon: Trophy, color: 'text-accent', bg: 'bg-accent/10' },
@@ -314,7 +310,6 @@ export default function SicboOracle() {
         <div className="grid lg:grid-cols-12 gap-6">
           <div className="lg:col-span-8 space-y-6">
             
-            {/* Main AI Prediction Card */}
             <Card className="border-primary/30 bg-gradient-to-br from-[#0a0a0a] to-[#000] overflow-hidden shadow-2xl relative rounded-3xl">
               {loadingAI && (
                 <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-20 flex flex-col items-center justify-center space-y-4">
@@ -367,7 +362,6 @@ export default function SicboOracle() {
               </CardContent>
             </Card>
 
-            {/* Leopard Analyzer Grid */}
             <div className="grid md:grid-cols-2 gap-6">
                <Card className={cn("border-2 rounded-2xl transition-all", 
                 leopardStatus?.recommendation === 'STRONG_BUY' ? 'border-amber-500 bg-amber-500/10' : 
@@ -424,7 +418,6 @@ export default function SicboOracle() {
           </div>
 
           <div className="lg:col-span-4 space-y-6">
-            {/* Input Panel */}
             <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl overflow-hidden">
               <CardHeader className="bg-white/2 px-6 py-4">
                 <CardTitle className="text-[9px] font-black uppercase text-white tracking-widest flex items-center justify-between">
@@ -455,7 +448,6 @@ export default function SicboOracle() {
               </CardContent>
             </Card>
 
-            {/* Config Panel */}
             <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl">
               <CardHeader className="px-6 py-4 border-b border-white/5">
                 <CardTitle className="text-[9px] font-black uppercase text-white tracking-widest flex items-center gap-2">
@@ -504,7 +496,6 @@ export default function SicboOracle() {
           </div>
         </div>
 
-        {/* Audit Log / History */}
         {history.length > 0 && (
           <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl overflow-hidden shadow-2xl">
             <CardHeader className="bg-white/2 p-5 border-b border-white/5 flex flex-row items-center justify-between">
@@ -516,20 +507,20 @@ export default function SicboOracle() {
               <table className="w-full text-center text-xs">
                 <thead>
                   <tr className="bg-black/40 text-[9px] font-black text-muted-foreground uppercase tracking-widest border-b border-white/5">
-                    <th className="p-4">Pattern</th>
+                    <th className="p-4 text-left pl-8">Pattern</th>
                     <th className="p-4">Total</th>
                     <th className="p-4">Result</th>
-                    <th className="p-4">Accuracy</th>
+                    <th className="p-4">AI Accuracy</th>
                     <th className="p-4 text-right pr-8">Bankroll</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {history.map((row: any, i: number) => (
                     <tr key={row.id || i} className="hover:bg-white/2 transition-colors">
-                      <td className="p-4">
-                        <div className="flex justify-center gap-1">
+                      <td className="p-4 pl-8">
+                        <div className="flex justify-start gap-1">
                           {row.dice.map((d: number, idx: number) => (
-                            <span key={idx} className={cn("w-5 h-5 rounded-md flex items-center justify-center font-black text-[9px] border", 
+                            <span key={idx} className={cn("w-6 h-6 rounded-md flex items-center justify-center font-black text-[10px] border shadow-sm", 
                               row.isLeopard ? 'bg-amber-500 border-amber-600 text-black' : 'bg-white/10 border-white/20 text-white'
                             )}>{d}</span>
                           ))}
@@ -537,8 +528,8 @@ export default function SicboOracle() {
                       </td>
                       <td className="p-4 font-black text-white">{row.total}</td>
                       <td className="p-4">
-                         <div className="flex flex-col items-center gap-0.5">
-                            <span className={cn("font-black px-2 py-0.5 rounded-full text-[9px]", 
+                         <div className="flex flex-col items-center gap-1">
+                            <span className={cn("font-black px-3 py-1 rounded-full text-[9px] uppercase tracking-wider", 
                               row.isLeopard ? 'bg-amber-500 text-black' : 
                               row.isBig ? 'bg-primary/20 text-primary' : 'bg-accent/20 text-accent'
                             )}>
@@ -547,25 +538,25 @@ export default function SicboOracle() {
                          </div>
                       </td>
                       <td className="p-4">
-                        <div className="flex items-center justify-center gap-2">
-                            <div className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black", 
-                                row.isCorrectSize ? 'bg-primary/20 text-primary' : 'bg-white/5 text-white/20'
+                        <div className="flex items-center justify-center gap-3">
+                            <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-lg text-[8px] font-black border", 
+                                row.isCorrectSize ? 'bg-primary/20 border-primary/30 text-primary' : 'bg-white/5 border-white/10 text-white/20'
                             )}>
-                                {row.isCorrectSize ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
+                                {row.isCorrectSize ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
                                 SIZE
                             </div>
-                            <div className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black", 
-                                row.isCorrectParity ? 'bg-accent/20 text-accent' : 'bg-white/5 text-white/20'
+                            <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-lg text-[8px] font-black border", 
+                                row.isCorrectParity ? 'bg-accent/20 border-accent/30 text-accent' : 'bg-white/5 border-white/10 text-white/20'
                             )}>
-                                {row.isCorrectParity ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
+                                {row.isCorrectParity ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
                                 PARITY
                             </div>
                         </div>
                       </td>
                       <td className="p-4 text-right pr-8">
                          <div className="flex flex-col items-end">
-                            <span className="font-black text-white text-[11px]">{formatIDR(row.currentBalance)}</span>
-                            <span className={cn("text-[8px] font-black", row.isCorrectSize ? 'text-accent' : 'text-destructive')}>
+                            <span className="font-black text-white text-[12px]">{formatIDR(row.currentBalance)}</span>
+                            <span className={cn("text-[8px] font-black mt-1", row.isCorrectSize ? 'text-accent' : 'text-destructive')}>
                                {row.isCorrectSize ? '+' : '-'}{formatIDR(row.betAmount)}
                             </span>
                          </div>
