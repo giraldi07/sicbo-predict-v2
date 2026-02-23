@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -71,36 +70,38 @@ export default function SicboOracle() {
   const [prediction, setPrediction] = useState<PredictSicBoOutcomeOutput | null>(null);
   const [leopardStatus, setLeopardStatus] = useState<PredictLeopardOpportunityOutput | null>(null);
 
-  // Fetch data dari Supabase
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
-    const { data, error } = await supabase
-      .from('game_history')
-      .select('*')
-      .order('createdAt', { ascending: false })
-      .limit(50);
+    try {
+      const { data, error } = await supabase
+        .from('game_history')
+        .select('*')
+        .order('createdAt', { ascending: false })
+        .limit(50);
 
-    if (error) {
-      console.error("Supabase Fetch Error:", error);
-      toast({ title: "Gagal memuat histori", variant: "destructive" });
-    } else {
-      setHistory(data || []);
-      // Update balance berdasarkan entry terbaru
-      if (data && data.length > 0) {
-        setBalance(data[0].currentBalance);
+      if (error) throw error;
+      
+      const gameHistory = data || [];
+      setHistory(gameHistory);
+      
+      if (gameHistory.length > 0) {
+        setBalance(Number(gameHistory[0].currentBalance));
       } else {
         setBalance(initialCapital);
       }
+    } catch (err: any) {
+      console.error("Supabase Error Details:", err.message || err);
+      // Jangan tampilkan toast error jika tabel memang belum ada (saat inisialisasi)
+    } finally {
+      setLoadingHistory(false);
     }
-    setLoadingHistory(false);
   }, [initialCapital]);
 
   useEffect(() => {
     fetchHistory();
 
-    // Berlangganan perubahan real-time
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel('game_history_changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'game_history' },
@@ -137,7 +138,6 @@ export default function SicboOracle() {
   const betLevel = Math.min(currentLossStreak, MULTIPLIERS.length - 1);
   const suggestedBet = baseBet * MULTIPLIERS[betLevel].multiplier;
 
-  // AI Update Logic
   const updatePredictions = useCallback(async (currentHistory: any[]) => {
     if (currentHistory.length < 3) return;
     setLoadingAI(true);
@@ -181,9 +181,9 @@ export default function SicboOracle() {
     let isCorrectSize = false;
     let isCorrectParity = false;
     
-    if (!isLeopard) {
-      if (predictedSize) isCorrectSize = (isBig ? 'BIG' : 'SMALL') === predictedSize;
-      if (predictedParity) isCorrectParity = (isOdd ? 'ODD' : 'EVEN') === predictedParity;
+    if (!isLeopard && predictedSize) {
+      isCorrectSize = (isBig ? 'BIG' : 'SMALL') === predictedSize;
+      isCorrectParity = (isOdd ? 'ODD' : 'EVEN') === (predictedParity || 'EVEN');
     }
 
     let newBalance = balance;
@@ -212,12 +212,11 @@ export default function SicboOracle() {
       createdAt: new Date().toISOString()
     };
 
-    // Simpan ke Supabase
     const { error } = await supabase.from('game_history').insert([newEntry]);
     
     if (error) {
-      console.error("Supabase Insert Error:", error);
-      toast({ title: "Gagal menyimpan ke Cloud", variant: "destructive" });
+      console.error("Supabase Insert Error:", error.message);
+      toast({ title: "Gagal menyimpan ke Cloud. Pastikan tabel sudah dibuat.", variant: "destructive" });
     } else {
       setBalance(newBalance);
       setCurrentRoll([]);
@@ -239,8 +238,7 @@ export default function SicboOracle() {
 
   const resetAll = async () => {
     try {
-      // Hapus semua data di Supabase
-      const { error } = await supabase.from('game_history').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      const { error } = await supabase.from('game_history').delete().neq('total', -1);
       
       if (error) throw error;
 
@@ -248,10 +246,11 @@ export default function SicboOracle() {
       setPrediction(null);
       setLeopardStatus(null);
       setCurrentRoll([]);
+      setHistory([]);
       setShowResetModal(false);
       toast({ title: "Supabase Cloud Berhasil Dibersihkan" });
-    } catch (err) {
-      console.error("Reset Error:", err);
+    } catch (err: any) {
+      console.error("Reset Error:", err.message);
       toast({ title: "Gagal menghapus data", variant: "destructive" });
     }
   };
@@ -262,8 +261,6 @@ export default function SicboOracle() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-foreground">
-      
-      {/* Permanent Sticky Header */}
       <header className="sticky top-0 z-[100] bg-[#050505]/90 backdrop-blur-2xl border-b border-white/5 py-3 px-4 md:px-8">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -273,7 +270,7 @@ export default function SicboOracle() {
             <div className="hidden sm:block">
               <h1 className="text-xl font-black tracking-tighter text-white uppercase italic leading-none">Oracle AI <span className="text-primary font-normal">Supabase</span></h1>
               <p className="text-[8px] text-muted-foreground font-black flex items-center gap-1 tracking-[0.2em] uppercase mt-0.5">
-                <ShieldCheck size={10} className="text-accent" /> Secure Persistence
+                <ShieldCheck size={10} className="text-accent" /> Cloud Storage Active
               </p>
             </div>
           </div>
@@ -299,21 +296,19 @@ export default function SicboOracle() {
       </header>
 
       <main className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
-        
         {loadingHistory && (
           <div className="flex items-center justify-center p-12 gap-3 text-primary">
             <Loader2 className="animate-spin" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Sinkronisasi Supabase...</span>
+            <span className="text-[10px] font-black uppercase tracking-widest">Sinkronisasi Cloud...</span>
           </div>
         )}
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: 'Oracle Winrate', value: `${stats.winRate}%`, icon: Trophy, color: 'text-accent', bg: 'bg-accent/10' },
             { label: 'Net Profit', value: formatIDR(stats.profit), icon: TrendingUp, color: stats.profit >= 0 ? 'text-accent' : 'text-destructive', bg: stats.profit >= 0 ? 'bg-accent/10' : 'bg-destructive/10' },
-            { label: 'Total Cycles', value: `Round ${stats.totalGames}`, icon: HistoryIcon, color: 'text-primary', bg: 'bg-primary/10' },
-            { label: 'Risk Level', value: currentLossStreak > 3 ? 'EXTREME' : 'STABLE', icon: Activity, color: currentLossStreak > 3 ? 'text-destructive' : 'text-accent', bg: currentLossStreak > 3 ? 'bg-destructive/10' : 'bg-accent/10' },
+            { label: 'Total Games', value: `${stats.totalGames} Rounds`, icon: HistoryIcon, color: 'text-primary', bg: 'bg-primary/10' },
+            { label: 'Current Risk', value: currentLossStreak > 3 ? 'EXTREME' : 'STABLE', icon: Activity, color: currentLossStreak > 3 ? 'text-destructive' : 'text-accent', bg: currentLossStreak > 3 ? 'bg-destructive/10' : 'bg-accent/10' },
           ].map((stat, i) => (
             <Card key={i} className="border-white/5 bg-white/5 rounded-2xl">
               <CardContent className="p-4 flex items-center gap-3">
@@ -330,31 +325,29 @@ export default function SicboOracle() {
         </div>
 
         <div className="grid lg:grid-cols-12 gap-6">
-          {/* Main Prediction Area */}
           <div className="lg:col-span-8 space-y-6">
-            
             <Card className="border-primary/30 bg-gradient-to-br from-[#0a0a0a] to-[#000] overflow-hidden shadow-2xl relative rounded-3xl">
               {loadingAI && (
                 <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-20 flex flex-col items-center justify-center space-y-4">
                   <Zap className="text-primary animate-pulse" size={48} />
-                  <p className="text-[10px] font-black uppercase tracking-[0.5em] text-primary">Analisis Neural Supabase</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.5em] text-primary">Neural AI Scanning Patterns...</p>
                 </div>
               )}
               <CardHeader className="flex flex-row items-center justify-between border-b border-white/5 bg-white/2 px-6 py-4">
                 <CardTitle className="text-[10px] font-black text-white uppercase flex items-center gap-2 tracking-[0.2em]">
-                  <Target size={14} className="text-primary" /> Global Pattern Engine
+                  <Target size={14} className="text-primary" /> Prediction Engine
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Button onClick={simulateRoll} variant="ghost" size="sm" className="h-7 text-[8px] font-black uppercase tracking-widest text-white/40 hover:text-primary">
                     AI Simulate
                   </Button>
-                  <Badge className="bg-accent text-white text-[8px] px-2 py-0.5 font-black">CONNECTED</Badge>
+                  <Badge className="bg-accent text-white text-[8px] px-2 py-0.5 font-black">ONLINE</Badge>
                 </div>
               </CardHeader>
               <CardContent className="p-6 sm:p-10 space-y-8">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-8">
                   <div className="text-center md:text-left">
-                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-2">Primary Prediction</p>
+                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-2">Next Outcome</p>
                     <h2 className={cn("text-7xl sm:text-9xl font-black tracking-tighter italic transition-all duration-500", 
                       prediction?.predictedSize === 'BIG' ? 'text-primary drop-shadow-[0_0_30px_rgba(139,92,246,0.3)]' : 
                       prediction?.predictedSize === 'SMALL' ? 'text-accent drop-shadow-[0_0_30px_rgba(13,148,136,0.3)]' : 'text-white/5'
@@ -363,12 +356,12 @@ export default function SicboOracle() {
                     </h2>
                     <div className="flex items-center justify-center md:justify-start gap-3 mt-4">
                       <Badge variant="outline" className="border-white/10 text-white font-black uppercase px-3 py-0.5 text-[10px]">{prediction?.predictedParity || 'WAITING'}</Badge>
-                      <span className="text-[10px] font-black text-primary uppercase tracking-widest">Confidence: {prediction?.confidence || 0}%</span>
+                      <span className="text-[10px] font-black text-primary uppercase tracking-widest">Conf: {prediction?.confidence || 0}%</span>
                     </div>
                   </div>
 
                   <div className="bg-white/5 p-6 sm:p-8 rounded-2xl border border-white/10 w-full md:w-auto text-center md:text-right">
-                    <p className="text-[9px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Suggested Stake</p>
+                    <p className="text-[9px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Suggested Bet</p>
                     <p className="text-3xl sm:text-4xl font-black text-white">{formatIDR(suggestedBet)}</p>
                     <div className="mt-3 flex items-center justify-center md:justify-end gap-2">
                        <Badge className="bg-primary/20 text-primary text-[9px] font-black px-2 uppercase tracking-tighter">Level {betLevel + 1}</Badge>
@@ -379,7 +372,7 @@ export default function SicboOracle() {
 
                 <div className="bg-white/2 rounded-xl p-5 border-l-4 border-primary relative overflow-hidden">
                   <p className="text-xs sm:text-sm text-white/80 font-medium italic leading-relaxed">
-                    "{prediction?.reason || "Input data histori untuk memulai sinkronisasi Supabase Oracle."}"
+                    "{prediction?.reason || "Input minimal 3 data histori untuk mengaktifkan AI Oracle."}"
                   </p>
                 </div>
               </CardContent>
@@ -392,7 +385,7 @@ export default function SicboOracle() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-black text-lg text-white italic tracking-tight uppercase flex items-center gap-2">
-                       <Dices size={20} className="text-amber-500" /> Leopard Alert
+                       <Dices size={20} className="text-amber-500" /> Leopard Opportunity
                     </h3>
                     {leopardStatus?.recommendation && (
                       <Badge className={cn("text-[9px] font-black", 
@@ -406,14 +399,14 @@ export default function SicboOracle() {
                       <p className="text-2xl font-black text-white">{leopardStatus?.rollsSinceLastLeopard ?? '0'}</p>
                     </div>
                     <div className="bg-black/40 rounded-xl p-4 border border-white/5 text-center flex flex-col justify-center">
-                      <p className="text-[8px] text-muted-foreground font-black uppercase mb-1">Status</p>
+                      <p className="text-[8px] text-muted-foreground font-black uppercase mb-1">Sleeper Status</p>
                       <p className={cn("text-[10px] font-black uppercase italic", leopardStatus?.isLeopardOpportunity ? 'text-amber-500 animate-pulse' : 'text-white/20')}>
-                        {leopardStatus?.isLeopardOpportunity ? 'READY TO HIT' : 'COLD'}
+                        {leopardStatus?.isLeopardOpportunity ? 'HOT' : 'COLD'}
                       </p>
                     </div>
                   </div>
                   <p className="text-[10px] text-white/50 italic leading-snug">
-                    {leopardStatus?.reasoning || "Memantau pola anomali triple dadu..."}
+                    {leopardStatus?.reasoning || "Menunggu data untuk analisis anomali triple..."}
                   </p>
                 </CardContent>
               </Card>
@@ -432,7 +425,7 @@ export default function SicboOracle() {
                     <span className="text-white bg-accent/20 px-2 py-0.5 rounded-md">{prediction?.predictedParity || '---'}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] font-bold border-t border-white/5 pt-2">
-                    <span className="text-primary uppercase">RECOVERY UNIT</span>
+                    <span className="text-primary uppercase">NEXT RECOVERY</span>
                     <span className="text-white font-black">{formatIDR(suggestedBet)}</span>
                   </div>
                 </div>
@@ -440,12 +433,11 @@ export default function SicboOracle() {
             </div>
           </div>
 
-          {/* Controls Area */}
           <div className="lg:col-span-4 space-y-6">
             <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl overflow-hidden">
               <CardHeader className="bg-white/2 px-6 py-4">
-                <CardTitle className="text-[9px] font-black uppercase text-white tracking-widest flex items-center justify-between">
-                  Manual Sensor Input
+                <CardTitle className="text-[9px] font-black uppercase text-white tracking-widest">
+                  Manual Input Sensor
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-6">
@@ -475,13 +467,13 @@ export default function SicboOracle() {
             <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl">
               <CardHeader className="px-6 py-4 border-b border-white/5">
                 <CardTitle className="text-[9px] font-black uppercase text-white tracking-widest flex items-center gap-2">
-                  <Settings2 size={14} /> Global Configuration
+                  <Settings2 size={14} /> Configuration
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-5">
                 <div className="space-y-2">
                   <label className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-1">
-                    <Wallet size={10}/> Initial Bankroll (IDR)
+                    <Wallet size={10}/> Initial Capital (IDR)
                   </label>
                   <Input 
                     type="number" 
@@ -503,7 +495,7 @@ export default function SicboOracle() {
                   />
                 </div>
                 <div className="pt-4 border-t border-white/5">
-                  <p className="text-[8px] font-black text-muted-foreground uppercase mb-3 tracking-widest text-center">Recovery Ladder</p>
+                  <p className="text-[8px] font-black text-muted-foreground uppercase mb-3 tracking-widest text-center">Martingale Ladder</p>
                   <div className="grid grid-cols-3 gap-1.5">
                     {MULTIPLIERS.map((m, i) => (
                       <div key={i} className={cn("p-2 rounded-lg flex flex-col items-center border transition-all", 
@@ -520,12 +512,11 @@ export default function SicboOracle() {
           </div>
         </div>
 
-        {/* Audit Log / History */}
         {history.length > 0 && (
           <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl overflow-hidden shadow-2xl">
-            <CardHeader className="bg-white/2 p-5 border-b border-white/5 flex flex-row items-center justify-between">
+            <CardHeader className="bg-white/2 p-5 border-b border-white/5">
               <CardTitle className="text-[9px] font-black uppercase text-white tracking-[0.3em] flex items-center gap-2">
-                <BarChart3 size={16} /> Supabase Neural Audit Log
+                <BarChart3 size={16} /> Cloud Audit Log
               </CardTitle>
             </CardHeader>
             <div className="overflow-x-auto">
@@ -533,9 +524,9 @@ export default function SicboOracle() {
                 <thead>
                   <tr className="bg-black/40 text-[9px] font-black text-muted-foreground uppercase tracking-widest border-b border-white/5">
                     <th className="p-4 text-left pl-8">Pattern</th>
-                    <th className="p-4">Total</th>
+                    <th className="p-4">Sum</th>
                     <th className="p-4">Result</th>
-                    <th className="p-4">Oracle Accuracy</th>
+                    <th className="p-4">Oracle Check</th>
                     <th className="p-4 text-right pr-8">Bankroll</th>
                   </tr>
                 </thead>
@@ -545,7 +536,7 @@ export default function SicboOracle() {
                       <td className="p-4 pl-8">
                         <div className="flex justify-start gap-1">
                           {row.dice.map((d: number, idx: number) => (
-                            <span key={idx} className={cn("w-6 h-6 rounded-md flex items-center justify-center font-black text-[10px] border shadow-sm", 
+                            <span key={idx} className={cn("w-6 h-6 rounded-md flex items-center justify-center font-black text-[10px] border", 
                               row.isLeopard ? 'bg-amber-500 border-amber-600 text-black' : 'bg-white/10 border-white/20 text-white'
                             )}>{d}</span>
                           ))}
@@ -564,13 +555,13 @@ export default function SicboOracle() {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center justify-center gap-3">
-                            <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-lg text-[8px] font-black border transition-all", 
+                            <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-lg text-[8px] font-black border", 
                                 row.isCorrectSize ? 'bg-primary/20 border-primary/30 text-primary' : 'bg-white/5 border-white/10 text-white/20'
                             )}>
                                 {row.isCorrectSize ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
                                 SIZE
                             </div>
-                            <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-lg text-[8px] font-black border transition-all", 
+                            <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-lg text-[8px] font-black border", 
                                 row.isCorrectParity ? 'bg-accent/20 border-accent/30 text-accent' : 'bg-white/5 border-white/10 text-white/20'
                             )}>
                                 {row.isCorrectParity ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
@@ -598,14 +589,14 @@ export default function SicboOracle() {
       <Dialog open={showResetModal} onOpenChange={setShowResetModal}>
         <DialogContent className="bg-[#0a0a0a] border-white/10 rounded-2xl max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-xl font-black text-destructive uppercase italic tracking-tight">Cloud Reset?</DialogTitle>
-            <DialogDescription className="text-muted-foreground pt-3 text-xs font-medium leading-relaxed">
-              Seluruh data histori di Supabase Cloud akan dihapus permanen.
+            <DialogTitle className="text-xl font-black text-destructive uppercase italic">Purge Cloud Data?</DialogTitle>
+            <DialogDescription className="text-muted-foreground pt-3 text-xs">
+              Seluruh histori di Supabase akan dihapus permanen. Saldo akan kembali ke modal awal.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-6 gap-2">
-            <Button variant="secondary" onClick={() => setShowResetModal(false)} className="rounded-xl h-10 px-4 text-[10px] font-black uppercase">Abort</Button>
-            <Button variant="destructive" onClick={resetAll} className="rounded-xl h-10 px-4 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-destructive/10">Purge Cloud</Button>
+            <Button variant="secondary" onClick={() => setShowResetModal(false)} className="rounded-xl h-10 px-4 text-[10px] font-black uppercase">Cancel</Button>
+            <Button variant="destructive" onClick={resetAll} className="rounded-xl h-10 px-4 text-[10px] font-black uppercase tracking-widest">Wipe Data</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
