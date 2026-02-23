@@ -17,7 +17,8 @@ import {
   History as HistoryIcon,
   Settings2,
   Trophy,
-  Dices
+  Dices,
+  Coins
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,29 +52,37 @@ const MULTIPLIERS = [
   { level: 6, multiplier: 216, text: "Level 6 (Maksimal)" }
 ];
 
-const INITIAL_BALANCE = 1000000;
-const INITIAL_BASE_BET = 10000;
+const DEFAULT_INITIAL_CAPITAL = 1000000;
+const DEFAULT_BASE_BET = 10000;
 
 export default function SicboOracle() {
   const [history, setHistory] = useState<any[]>([]);
   const [currentRoll, setCurrentRoll] = useState<number[]>([]);
-  const [balance, setBalance] = useState(INITIAL_BALANCE);
-  const [baseBet, setBaseBet] = useState(INITIAL_BASE_BET);
+  const [initialCapital, setInitialCapital] = useState(DEFAULT_INITIAL_CAPITAL);
+  const [balance, setBalance] = useState(DEFAULT_INITIAL_CAPITAL);
+  const [baseBet, setBaseBet] = useState(DEFAULT_BASE_BET);
   const [showResetModal, setShowResetModal] = useState(false);
   const [loadingAI, setLoadingAI] = useState(false);
   
   const [prediction, setPrediction] = useState<PredictSicBoOutcomeOutput | null>(null);
   const [leopardStatus, setLeopardStatus] = useState<PredictLeopardOpportunityOutput | null>(null);
 
+  // Jika histori kosong, biarkan user merubah saldo lewat input modal awal
+  useEffect(() => {
+    if (history.length === 0) {
+      setBalance(initialCapital);
+    }
+  }, [initialCapital, history.length]);
+
   const stats = useMemo(() => {
     if (history.length === 0) return { winRate: 0, profit: 0, totalGames: 0 };
     const correctCount = history.filter(h => h.isCorrectSize === true).length;
     return {
       winRate: Math.round((correctCount / history.length) * 100),
-      profit: balance - INITIAL_BALANCE,
+      profit: balance - initialCapital,
       totalGames: history.length
     };
-  }, [history, balance]);
+  }, [history, balance, initialCapital]);
 
   const currentLossStreak = useMemo(() => {
     let streak = 0;
@@ -189,14 +198,14 @@ export default function SicboOracle() {
 
   const resetAll = () => {
     setHistory([]);
-    setBalance(INITIAL_BALANCE);
+    setBalance(initialCapital);
     setPrediction(null);
     setLeopardStatus(null);
     setCurrentRoll([]);
     setShowResetModal(false);
     toast({ 
       title: "Data Dihapus", 
-      description: "Seluruh histori dan saldo telah dikembalikan ke kondisi awal." 
+      description: "Seluruh histori dan saldo telah dikembalikan ke kondisi awal sesuai modal yang Anda tentukan." 
     });
   };
 
@@ -394,7 +403,28 @@ export default function SicboOracle() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
-                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Taruhan Dasar (IDR)</label>
+                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
+                    <Coins size={10} className="text-primary" /> Modal Awal (IDR)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-black text-xs">Rp</span>
+                    <Input 
+                      type="number" 
+                      value={initialCapital} 
+                      onChange={(e) => setInitialCapital(Number(e.target.value))}
+                      disabled={history.length > 0}
+                      className="bg-black/40 border-white/10 h-10 md:h-12 pl-12 font-black text-white rounded-xl focus:ring-primary disabled:opacity-50"
+                    />
+                  </div>
+                  {history.length > 0 && (
+                    <p className="text-[8px] text-amber-500 font-bold uppercase tracking-tight">Kunci terbuka setelah data di-reset.</p>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
+                    <Target size={10} className="text-accent" /> Taruhan Dasar (IDR)
+                  </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-black text-xs">Rp</span>
                     <Input 
@@ -405,6 +435,7 @@ export default function SicboOracle() {
                     />
                   </div>
                 </div>
+
                 <div className="pt-4 border-t border-white/5">
                   <p className="text-[9px] font-black text-muted-foreground uppercase mb-3 tracking-widest">Recovery Ladder</p>
                   <div className="space-y-1.5">
@@ -495,10 +526,10 @@ export default function SicboOracle() {
               <AlertTriangle className="animate-pulse shrink-0" /> Konfirmasi Reset
             </DialogTitle>
             <DialogDescription className="text-muted-foreground font-medium pt-2 text-sm">
-              Tindakan ini akan menghapus seluruh histori permainan, mengembalikan saldo ke Rp 1.000.000, dan mereset memori analisis AI.
+              Tindakan ini akan menghapus seluruh histori permainan, mengembalikan saldo ke modal awal yang Anda tentukan (Rp {initialCapital.toLocaleString()}), dan mereset memori analisis AI.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 md:gap-3 mt-6 flex-row justify-end">
+          <DialogFooter className="gap-2 md:gap-3 mt-6 flex flex-row justify-end">
             <Button variant="secondary" onClick={() => setShowResetModal(false)} className="rounded-xl font-bold bg-white/5 hover:bg-white/10 border-none text-xs h-9">Batal</Button>
             <Button variant="destructive" onClick={resetAll} className="rounded-xl font-black uppercase tracking-widest shadow-lg shadow-destructive/20 text-xs h-9">Wipe Data</Button>
           </DialogFooter>
@@ -507,3 +538,4 @@ export default function SicboOracle() {
     </div>
   );
 }
+
