@@ -19,7 +19,9 @@ import {
   ShieldCheck,
   AlertCircle,
   Flame,
-  Bomb
+  Bomb,
+  Activity,
+  ChevronRight
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -95,7 +97,6 @@ export default function SicboOracle() {
   const suggestedBet = baseBet * MULTIPLIERS[betLevel].multiplier;
 
   const updatePredictions = useCallback(async (currentHistory: any[]) => {
-    if (currentHistory.length < 1) return;
     setLoadingAI(true);
     try {
       const formattedHistory = currentHistory.slice(0, 40).map(h => ({
@@ -122,16 +123,18 @@ export default function SicboOracle() {
   const processRoll = useCallback((roll: number[]) => {
     const total = roll.reduce((a, b) => a + b, 0);
     const isLeopard = roll[0] === roll[1] && roll[1] === roll[2];
-    
-    // Di Sic Bo, jika Triple muncul, Big dan Small biasanya kalah
     const isBig = !isLeopard && total >= 11;
     const isOdd = total % 2 !== 0;
     
     const predictedSize = prediction?.predictedSize;
+    const predictedParity = prediction?.predictedParity;
+
     let isCorrectSize = false;
+    let isCorrectParity = false;
     
-    if (!isLeopard && predictedSize) {
-      isCorrectSize = (isBig ? 'BIG' : 'SMALL') === predictedSize;
+    if (!isLeopard) {
+      if (predictedSize) isCorrectSize = (isBig ? 'BIG' : 'SMALL') === predictedSize;
+      if (predictedParity) isCorrectParity = (isOdd ? 'ODD' : 'EVEN') === predictedParity;
     }
 
     let newBalance = balance;
@@ -154,8 +157,11 @@ export default function SicboOracle() {
       isLeopard,
       isOdd,
       isCorrectSize: isLeopard ? false : isCorrectSize,
+      isCorrectParity: isLeopard ? false : isCorrectParity,
       betAmount: suggestedBet,
-      currentBalance: newBalance
+      currentBalance: newBalance,
+      predictionSize: predictedSize,
+      predictionParity: predictedParity
     };
 
     const newHistory = [newEntry, ...history];
@@ -193,50 +199,61 @@ export default function SicboOracle() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-foreground p-4 md:p-8 pb-24">
-      <div className="max-w-6xl mx-auto space-y-6">
-        
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-2xl shadow-primary/30 rotate-3">
-              <BrainCircuit className="text-white" size={28} />
+    <div className="min-h-screen bg-[#050505] text-foreground">
+      
+      {/* Permanent Sticky Header */}
+      <header className="sticky top-0 z-[100] bg-[#050505]/90 backdrop-blur-2xl border-b border-white/5 py-3 px-4 md:px-8">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 rotate-3">
+              <BrainCircuit className="text-white" size={20} />
             </div>
-            <div>
-              <h1 className="text-3xl font-black tracking-tighter text-white uppercase italic leading-none">Oracle AI <span className="text-primary font-normal">X-100</span></h1>
-              <p className="text-[10px] text-muted-foreground font-black flex items-center gap-2 tracking-[0.2em] uppercase mt-1">
-                <ShieldCheck size={12} className="text-accent" /> Neural Pattern Analyzer
+            <div className="hidden sm:block">
+              <h1 className="text-xl font-black tracking-tighter text-white uppercase italic leading-none">Oracle AI <span className="text-primary font-normal">X-100</span></h1>
+              <p className="text-[8px] text-muted-foreground font-black flex items-center gap-1 tracking-[0.2em] uppercase mt-0.5">
+                <ShieldCheck size={10} className="text-accent" /> Neural Pattern Analyzer
               </p>
             </div>
           </div>
+
           <div className="flex items-center gap-3">
-            <div className="bg-white/5 border border-white/10 rounded-2xl px-5 py-3 flex items-center gap-4 backdrop-blur-md">
-              <Wallet className="text-accent" size={22} />
-              <div>
-                <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest">Available Balance</p>
-                <p className="text-lg font-black text-white">{formatIDR(balance)}</p>
+            <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 flex items-center gap-3">
+              <Wallet className="text-accent hidden xs:block" size={18} />
+              <div className="text-right sm:text-left">
+                <p className="text-[8px] text-muted-foreground uppercase font-black tracking-widest leading-none mb-1">Live Bankroll</p>
+                <p className="text-sm sm:text-base font-black text-white leading-none">{formatIDR(balance)}</p>
               </div>
             </div>
-            <Button variant="outline" size="icon" onClick={() => setShowResetModal(true)} className="border-destructive/30 hover:bg-destructive/10 rounded-2xl w-12 h-12">
-              <Trash2 className="text-destructive" size={20} />
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={() => setShowResetModal(true)} 
+              className="border-destructive/30 hover:bg-destructive/10 rounded-xl w-10 h-10 shrink-0"
+            >
+              <Trash2 className="text-destructive" size={18} />
             </Button>
           </div>
-        </header>
+        </div>
+      </header>
 
+      <main className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
+        
+        {/* Quick Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Oracle Accuracy', value: `${stats.winRate}%`, icon: Trophy, color: 'text-accent', bg: 'bg-accent/10' },
-            { label: 'Total Net P/L', value: formatIDR(stats.profit), icon: TrendingUp, color: stats.profit >= 0 ? 'text-accent' : 'text-destructive', bg: stats.profit >= 0 ? 'bg-accent/10' : 'bg-destructive/10' },
-            { label: 'Cycle Count', value: stats.totalGames, icon: HistoryIcon, color: 'text-primary', bg: 'bg-primary/10' },
-            { label: 'Risk Factor', value: currentLossStreak > 3 ? 'HIGH' : 'SAFE', icon: AlertTriangle, color: currentLossStreak > 3 ? 'text-destructive' : 'text-accent', bg: currentLossStreak > 3 ? 'bg-destructive/10' : 'bg-accent/10' },
+            { label: 'Oracle Winrate', value: `${stats.winRate}%`, icon: Trophy, color: 'text-accent', bg: 'bg-accent/10' },
+            { label: 'Net Profit', value: formatIDR(stats.profit), icon: TrendingUp, color: stats.profit >= 0 ? 'text-accent' : 'text-destructive', bg: stats.profit >= 0 ? 'bg-accent/10' : 'bg-destructive/10' },
+            { label: 'Cycle Progress', value: `Round ${stats.totalGames}`, icon: HistoryIcon, color: 'text-primary', bg: 'bg-primary/10' },
+            { label: 'Risk Level', value: currentLossStreak > 3 ? 'EXTREME' : 'STABLE', icon: Activity, color: currentLossStreak > 3 ? 'text-destructive' : 'text-accent', bg: currentLossStreak > 3 ? 'bg-destructive/10' : 'bg-accent/10' },
           ].map((stat, i) => (
-            <Card key={i} className="border-white/5 bg-white/5 backdrop-blur-sm rounded-2xl">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className={cn("p-3 rounded-xl", stat.bg)}>
-                  <stat.icon size={20} className={stat.color} />
+            <Card key={i} className="border-white/5 bg-white/5 rounded-2xl">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className={cn("p-2.5 rounded-lg shrink-0", stat.bg)}>
+                  <stat.icon size={18} className={stat.color} />
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">{stat.label}</p>
-                  <p className="text-base font-black text-white">{stat.value}</p>
+                  <p className="text-[8px] uppercase font-black text-muted-foreground tracking-widest leading-none mb-1">{stat.label}</p>
+                  <p className="text-sm font-black text-white leading-none">{stat.value}</p>
                 </div>
               </CardContent>
             </Card>
@@ -245,131 +262,110 @@ export default function SicboOracle() {
 
         <div className="grid lg:grid-cols-12 gap-6">
           <div className="lg:col-span-8 space-y-6">
-            <Card className="border-primary/30 bg-gradient-to-br from-[#0a0a0a] to-[#000] overflow-hidden shadow-2xl relative rounded-3xl min-h-[400px]">
+            
+            {/* Main AI Prediction Card */}
+            <Card className="border-primary/30 bg-gradient-to-br from-[#0a0a0a] to-[#000] overflow-hidden shadow-2xl relative rounded-3xl">
               {loadingAI && (
                 <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-20 flex flex-col items-center justify-center space-y-4">
-                  <div className="relative">
-                    <Zap className="text-primary animate-ping absolute inset-0" size={48} />
-                    <Zap className="text-primary relative z-10" size={48} />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs font-black uppercase tracking-[0.5em] text-primary">Scanning Neural Network</p>
-                    <p className="text-[10px] text-muted-foreground mt-2">Correlating 40+ history points...</p>
-                  </div>
+                  <Zap className="text-primary animate-pulse" size={48} />
+                  <p className="text-[10px] font-black uppercase tracking-[0.5em] text-primary">Scanning Neural Network</p>
                 </div>
               )}
-              <CardHeader className="flex flex-row items-center justify-between border-b border-white/5 bg-white/2 px-8 py-6">
-                <CardTitle className="text-[12px] font-black text-white uppercase flex items-center gap-3 tracking-widest">
-                  <Target size={18} className="text-primary" /> Active Prediction Engine
+              <CardHeader className="flex flex-row items-center justify-between border-b border-white/5 bg-white/2 px-6 py-4">
+                <CardTitle className="text-[10px] font-black text-white uppercase flex items-center gap-2 tracking-[0.2em]">
+                  <Target size={14} className="text-primary" /> Strategy Engine
                 </CardTitle>
-                <div className="flex items-center gap-3">
-                   <Button onClick={simulateRoll} variant="ghost" size="sm" className="h-8 text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-primary transition-all">
-                    Generate Data
+                <div className="flex items-center gap-2">
+                  <Button onClick={simulateRoll} variant="ghost" size="sm" className="h-7 text-[8px] font-black uppercase tracking-widest text-white/40 hover:text-primary">
+                    AI Simulate
                   </Button>
-                  <Badge className={cn("text-[10px] px-3 py-1 font-black rounded-full", loadingAI ? "animate-pulse" : "bg-accent text-white")}>
-                    {loadingAI ? "SYNCING" : "LIVE"}
-                  </Badge>
+                  <Badge className="bg-accent text-white text-[8px] px-2 py-0.5 font-black">ACTIVE</Badge>
                 </div>
               </CardHeader>
-              <CardContent className="p-10 space-y-10">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-10">
+              <CardContent className="p-6 sm:p-10 space-y-8">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-8">
                   <div className="text-center md:text-left">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mb-4">Market Prediction</p>
-                    <h2 className={cn("text-8xl md:text-9xl font-black tracking-tighter transition-all italic", 
-                      prediction?.predictedSize === 'BIG' ? 'text-primary drop-shadow-[0_0_30px_rgba(124,58,237,0.5)]' : 
-                      prediction?.predictedSize === 'SMALL' ? 'text-accent drop-shadow-[0_0_30px_rgba(0,128,128,0.5)]' : 'text-white/5'
+                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-2">Primary Prediction</p>
+                    <h2 className={cn("text-7xl sm:text-9xl font-black tracking-tighter italic", 
+                      prediction?.predictedSize === 'BIG' ? 'text-primary drop-shadow-2xl' : 
+                      prediction?.predictedSize === 'SMALL' ? 'text-accent drop-shadow-2xl' : 'text-white/5'
                     )}>
                       {prediction?.predictedSize || '---'}
                     </h2>
-                    <div className="flex items-center justify-center md:justify-start gap-4 mt-6">
-                      <Badge variant="outline" className="border-white/10 text-white font-black uppercase px-4 py-1 tracking-widest">{prediction?.predictedParity || 'WAITING'}</Badge>
-                      <span className="text-[11px] font-black text-primary uppercase tracking-widest">Confidence: {prediction?.confidence || 0}%</span>
+                    <div className="flex items-center justify-center md:justify-start gap-3 mt-4">
+                      <Badge variant="outline" className="border-white/10 text-white font-black uppercase px-3 py-0.5 text-[10px]">{prediction?.predictedParity || 'WAITING'}</Badge>
+                      <span className="text-[10px] font-black text-primary uppercase tracking-widest">Confidence: {prediction?.confidence || 0}%</span>
                     </div>
                   </div>
 
-                  <div className="bg-white/5 p-8 rounded-3xl border border-white/10 w-full md:w-auto text-center md:text-right shadow-inner">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-2 tracking-widest">Aggressive Allocation</p>
-                    <p className="text-4xl font-black text-white">{formatIDR(suggestedBet)}</p>
-                    <div className="mt-4 flex items-center justify-center md:justify-end gap-2">
-                       <Badge className="bg-primary/20 text-primary border-none text-[10px] font-black px-3">LEVEL {betLevel + 1}</Badge>
-                       <Badge className="bg-white/10 text-white border-none text-[10px] font-black px-3">X{MULTIPLIERS[betLevel].multiplier}</Badge>
+                  <div className="bg-white/5 p-6 sm:p-8 rounded-2xl border border-white/10 w-full md:w-auto text-center md:text-right">
+                    <p className="text-[9px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Suggested Stake</p>
+                    <p className="text-3xl sm:text-4xl font-black text-white">{formatIDR(suggestedBet)}</p>
+                    <div className="mt-3 flex items-center justify-center md:justify-end gap-2">
+                       <Badge className="bg-primary/20 text-primary text-[9px] font-black px-2">L{betLevel + 1}</Badge>
+                       <Badge className="bg-white/10 text-white text-[9px] font-black px-2">X{MULTIPLIERS[betLevel].multiplier}</Badge>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white/2 rounded-2xl p-6 border-l-8 border-primary relative overflow-hidden">
-                   <div className="absolute top-0 right-0 p-2 opacity-10">
-                      <BrainCircuit size={40} />
-                   </div>
-                  <p className="text-sm text-white/80 font-medium italic leading-relaxed relative z-10">
-                    "{prediction?.reason || "Kumpulkan minimal 1 data historis untuk mengkalibrasi sensor Oracle."}"
+                <div className="bg-white/2 rounded-xl p-5 border-l-4 border-primary relative overflow-hidden">
+                  <p className="text-xs sm:text-sm text-white/80 font-medium italic leading-relaxed">
+                    "{prediction?.reason || "Input data histori untuk memulai proses sinkronisasi Oracle."}"
                   </p>
                 </div>
               </CardContent>
             </Card>
 
+            {/* Leopard Analyzer Grid */}
             <div className="grid md:grid-cols-2 gap-6">
-               <Card className={cn("border-2 transition-all rounded-3xl relative overflow-hidden", 
+               <Card className={cn("border-2 rounded-2xl transition-all", 
                 leopardStatus?.recommendation === 'STRONG_BUY' ? 'border-amber-500 bg-amber-500/10' : 
                 leopardStatus?.recommendation === 'BET_HEAVY' ? 'border-amber-500/50 bg-amber-500/5' : 'border-white/5 bg-white/2')}>
-                <CardContent className="p-8">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                      <div className={cn("p-3 rounded-2xl", leopardStatus?.recommendation === 'STRONG_BUY' ? 'bg-amber-500 text-black' : 'bg-white/5 text-muted-foreground')}>
-                        <Dices size={24} className={leopardStatus?.isLeopardOpportunity ? 'animate-bounce' : ''} />
-                      </div>
-                      <h3 className="font-black text-xl text-white tracking-tighter italic">ANY TRIPLE ORACLE</h3>
-                    </div>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-black text-lg text-white italic tracking-tight uppercase flex items-center gap-2">
+                       <Dices size={20} className="text-amber-500" /> Leopard Alert
+                    </h3>
                     {leopardStatus?.recommendation && (
-                      <Badge className={cn("font-black text-[10px] px-3 py-1 animate-pulse", 
+                      <Badge className={cn("text-[9px] font-black", 
                         leopardStatus.recommendation === 'STRONG_BUY' ? 'bg-red-600' : 'bg-amber-500 text-black'
-                      )}>
-                        {leopardStatus.recommendation}
-                      </Badge>
+                      )}>{leopardStatus.recommendation}</Badge>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="bg-black/60 rounded-2xl p-5 border border-white/5 text-center">
-                      <p className="text-[10px] text-muted-foreground font-black uppercase mb-2 tracking-widest">Sleeper Interval</p>
-                      <p className="text-3xl font-black text-white">{leopardStatus?.rollsSinceLastLeopard ?? '0'}</p>
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="bg-black/40 rounded-xl p-4 border border-white/5 text-center">
+                      <p className="text-[8px] text-muted-foreground font-black uppercase mb-1">Interval</p>
+                      <p className="text-2xl font-black text-white">{leopardStatus?.rollsSinceLastLeopard ?? '0'}</p>
                     </div>
-                    <div className="bg-black/60 rounded-2xl p-5 border border-white/5 text-center">
-                      <p className="text-[10px] text-muted-foreground font-black uppercase mb-2 tracking-widest">AI Status</p>
-                      <p className={cn("text-lg font-black uppercase italic", leopardStatus?.isLeopardOpportunity ? 'text-amber-500' : 'text-white/20')}>
-                        {leopardStatus?.isLeopardOpportunity ? 'DANGER' : 'STANDBY'}
+                    <div className="bg-black/40 rounded-xl p-4 border border-white/5 text-center flex flex-col justify-center">
+                      <p className="text-[8px] text-muted-foreground font-black uppercase mb-1">Status</p>
+                      <p className={cn("text-[10px] font-black uppercase italic", leopardStatus?.isLeopardOpportunity ? 'text-amber-500 animate-pulse' : 'text-white/20')}>
+                        {leopardStatus?.isLeopardOpportunity ? 'READY TO HIT' : 'COLD'}
                       </p>
                     </div>
                   </div>
-                  <div className="bg-black/40 p-4 rounded-xl flex items-start gap-4">
-                    <AlertCircle size={20} className="text-amber-500 mt-1 shrink-0" />
-                    <p className="text-xs text-white/60 font-bold leading-relaxed">
-                      {leopardStatus?.reasoning || "Memantau pola Triple... Secara matematis Triple (Leopard) muncul setiap 36-40 roll dengan payout 30:1."}
-                    </p>
-                  </div>
+                  <p className="text-[10px] text-white/50 italic leading-snug">
+                    {leopardStatus?.reasoning || "Memantau pola anomali triple dadu..."}
+                  </p>
                 </CardContent>
               </Card>
 
-              <Card className="border-white/5 bg-white/2 rounded-3xl p-8 flex flex-col justify-center">
-                <div className="flex items-center gap-4 mb-6">
-                   <div className="p-3 bg-red-500/10 rounded-2xl text-red-500">
-                      <Flame size={24} />
-                   </div>
-                   <h3 className="font-black text-xl text-white tracking-tighter italic uppercase">Quick Decision</h3>
-                </div>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-                    <span className="text-[11px] font-black uppercase text-muted-foreground">Bet Size</span>
-                    <span className="text-sm font-black text-white">{prediction?.predictedSize || '---'}</span>
+              <Card className="border-white/5 bg-white/2 rounded-2xl p-6">
+                <h3 className="font-black text-lg text-white italic tracking-tight uppercase mb-4 flex items-center gap-2">
+                  <Flame size={20} className="text-red-500" /> Hot Summary
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-[11px] font-bold">
+                    <span className="text-muted-foreground">SIZE PREDICTION</span>
+                    <span className="text-white bg-primary/20 px-2 py-0.5 rounded-md">{prediction?.predictedSize || '---'}</span>
                   </div>
-                  <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-                    <span className="text-[11px] font-black uppercase text-muted-foreground">Bet Leopard</span>
-                    <span className={cn("text-sm font-black", leopardStatus?.isLeopardOpportunity ? 'text-amber-500' : 'text-white/20')}>
-                      {leopardStatus?.isLeopardOpportunity ? 'YES (LIGHT)' : 'NO'}
-                    </span>
+                  <div className="flex items-center justify-between text-[11px] font-bold">
+                    <span className="text-muted-foreground">PARITY PREDICTION</span>
+                    <span className="text-white bg-accent/20 px-2 py-0.5 rounded-md">{prediction?.predictedParity || '---'}</span>
                   </div>
-                  <div className="flex items-center justify-between p-4 bg-primary/20 rounded-2xl border border-primary/20">
-                    <span className="text-[11px] font-black uppercase text-primary">Total Recommendation</span>
-                    <span className="text-sm font-black text-white">{formatIDR(suggestedBet + (leopardStatus?.isLeopardOpportunity ? baseBet : 0))}</span>
+                  <div className="flex items-center justify-between text-[11px] font-bold border-t border-white/5 pt-2">
+                    <span className="text-primary uppercase">TOTAL RECOVERY BET</span>
+                    <span className="text-white font-black">{formatIDR(suggestedBet)}</span>
                   </div>
                 </div>
               </Card>
@@ -377,29 +373,30 @@ export default function SicboOracle() {
           </div>
 
           <div className="lg:col-span-4 space-y-6">
+            {/* Input Panel */}
             <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl overflow-hidden">
-              <CardHeader className="flex flex-row items-center justify-between border-b border-white/5 bg-white/2 px-6 py-4">
-                <CardTitle className="text-[11px] font-black uppercase text-white tracking-[0.2em]">Input Manual Sensor</CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => setHistory(h => h.slice(1))} className="h-8 text-[10px] font-black text-white/40">
-                  REVERT LAST
-                </Button>
+              <CardHeader className="bg-white/2 px-6 py-4">
+                <CardTitle className="text-[9px] font-black uppercase text-white tracking-widest flex items-center justify-between">
+                  Manual Sensor Input
+                  <Button variant="ghost" size="sm" onClick={() => setHistory(h => h.slice(1))} className="h-6 text-[8px] opacity-40 hover:opacity-100">REV LAST</Button>
+                </CardTitle>
               </CardHeader>
-              <CardContent className="p-8 space-y-8">
-                <div className="flex justify-center gap-4">
+              <CardContent className="p-6 space-y-6">
+                <div className="flex justify-center gap-3">
                   {[0, 1, 2].map(i => (
-                    <div key={i} className={cn("w-16 h-16 rounded-2xl flex items-center justify-center text-3xl font-black border-2 transition-all duration-300", 
-                      currentRoll[i] ? 'bg-primary border-primary text-white scale-110 shadow-[0_0_20px_rgba(124,58,237,0.4)]' : 'bg-white/5 border-white/10 text-white/10'
+                    <div key={i} className={cn("w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-black border transition-all", 
+                      currentRoll[i] ? 'bg-primary border-primary text-white scale-110 shadow-lg' : 'bg-white/2 border-white/5 text-white/5'
                     )}>
                       {currentRoll[i] || '?'}
                     </div>
                   ))}
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2">
                   {[1, 2, 3, 4, 5, 6].map(n => (
                     <Button 
                       key={n} 
                       onClick={() => handleNumberClick(n)} 
-                      className="h-16 text-2xl font-black bg-white/5 hover:bg-primary hover:scale-105 active:scale-95 transition-all rounded-2xl border border-white/5"
+                      className="h-14 text-xl font-black bg-white/5 hover:bg-primary rounded-xl border border-white/5"
                     >
                       {n}
                     </Button>
@@ -408,45 +405,46 @@ export default function SicboOracle() {
               </CardContent>
             </Card>
 
+            {/* Config Panel */}
             <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl">
               <CardHeader className="px-6 py-4 border-b border-white/5">
-                <CardTitle className="text-[11px] font-black uppercase text-white tracking-[0.2em] flex items-center gap-2">
-                  <Settings2 size={16} /> Oracle Config
+                <CardTitle className="text-[9px] font-black uppercase text-white tracking-widest flex items-center gap-2">
+                  <Settings2 size={14} /> Oracle Configuration
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-6 space-y-6">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                    <Wallet size={12}/> Initial Bankroll (IDR)
+              <CardContent className="p-6 space-y-5">
+                <div className="space-y-2">
+                  <label className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-1">
+                    <Wallet size={10}/> Initial Bankroll (IDR)
                   </label>
                   <Input 
                     type="number" 
                     value={initialCapital} 
                     onChange={(e) => setInitialCapital(Number(e.target.value))}
                     disabled={history.length > 0}
-                    className="bg-black border-white/10 font-black h-12 rounded-xl focus:ring-primary text-white"
+                    className="bg-black border-white/10 font-black h-10 text-xs rounded-xl focus:ring-primary text-white"
                   />
                 </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                    <Bomb size={12}/> Base Bet Unit (IDR)
+                <div className="space-y-2">
+                  <label className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-1">
+                    <Bomb size={10}/> Base Bet Unit (IDR)
                   </label>
                   <Input 
                     type="number" 
                     value={baseBet} 
                     onChange={(e) => setBaseBet(Number(e.target.value))}
-                    className="bg-black border-white/10 font-black h-12 rounded-xl focus:ring-primary text-white"
+                    className="bg-black border-white/10 font-black h-10 text-xs rounded-xl focus:ring-primary text-white"
                   />
                 </div>
-                <div className="pt-6 border-t border-white/5">
-                  <p className="text-[10px] font-black text-muted-foreground uppercase mb-4 tracking-widest">Recovery Ladder (Martingale)</p>
-                  <div className="grid grid-cols-3 gap-2">
+                <div className="pt-4 border-t border-white/5">
+                  <p className="text-[8px] font-black text-muted-foreground uppercase mb-3 tracking-widest text-center">Recovery Ladder (Martingale)</p>
+                  <div className="grid grid-cols-3 gap-1.5">
                     {MULTIPLIERS.map((m, i) => (
-                      <div key={i} className={cn("text-[9px] p-3 rounded-xl flex flex-col items-center border transition-all", 
-                        i === betLevel ? 'bg-primary border-primary text-white font-black scale-105 shadow-lg' : 'bg-white/5 border-white/5 text-muted-foreground'
+                      <div key={i} className={cn("p-2 rounded-lg flex flex-col items-center border transition-all", 
+                        i === betLevel ? 'bg-primary border-primary text-white font-black' : 'bg-white/2 border-white/5 text-muted-foreground'
                       )}>
-                        <span className="font-black uppercase">{m.text}</span>
-                        <span className="text-xs font-black">X{m.multiplier}</span>
+                        <span className="text-[7px] uppercase leading-none mb-1">{m.text}</span>
+                        <span className="text-[10px] font-black leading-none">X{m.multiplier}</span>
                       </div>
                     ))}
                   </div>
@@ -456,58 +454,89 @@ export default function SicboOracle() {
           </div>
         </div>
 
+        {/* Audit Log / History */}
         {history.length > 0 && (
           <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl overflow-hidden shadow-2xl">
-            <CardHeader className="bg-white/2 p-6 border-b border-white/5">
-              <CardTitle className="text-[11px] font-black uppercase text-white tracking-[0.3em] flex items-center gap-3">
-                <BarChart3 size={18} /> Neural Audit Log
+            <CardHeader className="bg-white/2 p-5 border-b border-white/5 flex flex-row items-center justify-between">
+              <CardTitle className="text-[9px] font-black uppercase text-white tracking-[0.3em] flex items-center gap-2">
+                <BarChart3 size={16} /> Neural Audit Log
               </CardTitle>
+              <div className="flex gap-4">
+                <div className="flex items-center gap-1.5">
+                   <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_5px_theme(colors.primary.DEFAULT)]" />
+                   <span className="text-[8px] font-black text-muted-foreground">BIG/SMALL HIT</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                   <div className="w-2 h-2 rounded-full bg-accent shadow-[0_0_5px_theme(colors.accent.DEFAULT)]" />
+                   <span className="text-[8px] font-black text-muted-foreground">ODD/EVEN HIT</span>
+                </div>
+              </div>
             </CardHeader>
             <div className="overflow-x-auto">
-              <table className="w-full text-center text-[12px]">
+              <table className="w-full text-center text-xs">
                 <thead>
-                  <tr className="bg-black/40 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-b border-white/5">
-                    <th className="p-5">Cycle</th>
-                    <th className="p-5">Dadu</th>
-                    <th className="p-5">Total</th>
-                    <th className="p-5">Hasil</th>
-                    <th className="p-5">Status Oracle</th>
-                    <th className="p-5 text-right pr-10">Bankroll Delta</th>
+                  <tr className="bg-black/40 text-[9px] font-black text-muted-foreground uppercase tracking-widest border-b border-white/5">
+                    <th className="p-4">Cycle</th>
+                    <th className="p-4">Dice Pattern</th>
+                    <th className="p-4">Total</th>
+                    <th className="p-4">Result</th>
+                    <th className="p-4">Oracle Prediction Accuracy</th>
+                    <th className="p-4 text-right pr-8">Bankroll Delta</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {history.map((row) => (
                     <tr key={row.id} className="hover:bg-white/2 transition-colors">
-                      <td className="p-5 text-muted-foreground font-black tracking-widest">#{row.num}</td>
-                      <td className="p-5">
-                        <div className="flex justify-center gap-2">
+                      <td className="p-4 text-muted-foreground font-black">#{row.num}</td>
+                      <td className="p-4">
+                        <div className="flex justify-center gap-1.5">
                           {row.dice.map((d: number, idx: number) => (
-                            <span key={idx} className={cn("w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs border shadow-inner", 
+                            <span key={idx} className={cn("w-6 h-6 rounded-md flex items-center justify-center font-black text-[10px] border", 
                               row.isLeopard ? 'bg-amber-500 border-amber-600 text-black' : 'bg-white/10 border-white/20 text-white'
                             )}>{d}</span>
                           ))}
                         </div>
                       </td>
-                      <td className="p-5 font-black text-white text-sm">{row.total}</td>
-                      <td className="p-5">
-                         <div className="flex flex-col items-center gap-1">
-                            <span className={cn("font-black px-3 py-0.5 rounded-full text-[10px]", row.isLeopard ? 'bg-amber-500 text-black' : row.isBig ? 'bg-primary/20 text-primary' : 'bg-accent/20 text-accent')}>
+                      <td className="p-4 font-black text-white">{row.total}</td>
+                      <td className="p-4">
+                         <div className="flex flex-col items-center gap-0.5">
+                            <span className={cn("font-black px-2 py-0.5 rounded-full text-[9px]", 
+                              row.isLeopard ? 'bg-amber-500 text-black' : 
+                              row.isBig ? 'bg-primary/20 text-primary' : 'bg-accent/20 text-accent'
+                            )}>
                               {row.isLeopard ? 'TRIPLE' : row.isBig ? 'BIG' : 'SMALL'}
                             </span>
-                            <span className="text-[9px] text-muted-foreground font-black uppercase">{row.isOdd ? 'ODD' : 'EVEN'}</span>
+                            <span className="text-[8px] text-muted-foreground font-bold uppercase">{row.isOdd ? 'ODD' : 'EVEN'}</span>
                          </div>
                       </td>
-                      <td className="p-5">
-                        {row.isCorrectSize !== null ? (
-                          row.isCorrectSize ? 
-                          <div className="flex items-center justify-center gap-2 text-accent font-black tracking-widest"><CheckCircle2 size={16}/> HIT</div> : 
-                          <div className="flex items-center justify-center gap-2 text-destructive font-black tracking-widest"><XCircle size={16}/> MISS</div>
-                        ) : 'STANDBY'}
+                      <td className="p-4">
+                        <div className="flex flex-col items-center gap-1.5">
+                           <div className="flex items-center gap-4">
+                              <div className="flex flex-col items-center">
+                                 <span className="text-[7px] text-muted-foreground uppercase font-black mb-1">Size</span>
+                                 <div className={cn("flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-black", 
+                                    row.isCorrectSize ? 'bg-primary/20 text-primary' : 'bg-white/5 text-white/20'
+                                 )}>
+                                    {row.isCorrectSize ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
+                                    {row.predictionSize || '---'}
+                                 </div>
+                              </div>
+                              <div className="flex flex-col items-center">
+                                 <span className="text-[7px] text-muted-foreground uppercase font-black mb-1">Parity</span>
+                                 <div className={cn("flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-black", 
+                                    row.isCorrectParity ? 'bg-accent/20 text-accent' : 'bg-white/5 text-white/20'
+                                 )}>
+                                    {row.isCorrectParity ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
+                                    {row.predictionParity || '---'}
+                                 </div>
+                              </div>
+                           </div>
+                        </div>
                       </td>
-                      <td className="p-5 text-right pr-10">
+                      <td className="p-4 text-right pr-8">
                          <div className="flex flex-col items-end">
-                            <span className="font-black text-white">{formatIDR(row.currentBalance)}</span>
-                            <span className={cn("text-[9px] font-black", row.isCorrectSize ? 'text-accent' : 'text-destructive')}>
+                            <span className="font-black text-white text-[11px]">{formatIDR(row.currentBalance)}</span>
+                            <span className={cn("text-[8px] font-black", row.isCorrectSize ? 'text-accent' : 'text-destructive')}>
                                {row.isCorrectSize ? '+' : '-'}{formatIDR(row.betAmount)}
                             </span>
                          </div>
@@ -519,19 +548,19 @@ export default function SicboOracle() {
             </div>
           </Card>
         )}
-      </div>
+      </main>
 
       <Dialog open={showResetModal} onOpenChange={setShowResetModal}>
-        <DialogContent className="bg-[#0a0a0a] border-white/10 rounded-3xl">
+        <DialogContent className="bg-[#0a0a0a] border-white/10 rounded-2xl max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black text-destructive uppercase italic tracking-tighter">Emergency Reset?</DialogTitle>
-            <DialogDescription className="text-muted-foreground pt-4 font-medium leading-relaxed">
-              Seluruh histori algoritma akan dihapus secara permanen. Saldo akan dikembalikan ke modal awal {formatIDR(initialCapital)}. Gunakan hanya jika strategi mengalami deviasi fatal.
+            <DialogTitle className="text-xl font-black text-destructive uppercase italic tracking-tight">System Purge?</DialogTitle>
+            <DialogDescription className="text-muted-foreground pt-3 text-xs font-medium leading-relaxed">
+              Seluruh histori algoritma akan dihapus. Saldo akan dikembalikan ke modal awal {formatIDR(initialCapital)}.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="mt-8 gap-3">
-            <Button variant="secondary" onClick={() => setShowResetModal(false)} className="rounded-2xl h-12 px-6 text-xs font-black uppercase">Abort</Button>
-            <Button variant="destructive" onClick={resetAll} className="rounded-2xl h-12 px-6 text-xs font-black uppercase tracking-widest shadow-2xl shadow-destructive/20">Wipe All Data</Button>
+          <DialogFooter className="mt-6 gap-2">
+            <Button variant="secondary" onClick={() => setShowResetModal(false)} className="rounded-xl h-10 px-4 text-[10px] font-black uppercase">Abort</Button>
+            <Button variant="destructive" onClick={resetAll} className="rounded-xl h-10 px-4 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-destructive/10">Purge Data</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
