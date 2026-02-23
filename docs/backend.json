@@ -1,0 +1,32 @@
+
+{
+  "entities": {
+    "GameHistory": {
+      "title": "GameHistory",
+      "description": "Menyimpan data setiap putaran permainan Sic Bo untuk analisis AI.",
+      "type": "object",
+      "properties": {
+        "dice": { "type": "array", "description": "Hasil lemparan 3 dadu" },
+        "total": { "type": "number", "description": "Total nilai dadu" },
+        "isBig": { "type": "boolean", "description": "Apakah hasilnya BIG" },
+        "isOdd": { "type": "boolean", "description": "Apakah hasilnya ODD" },
+        "isLeopard": { "type": "boolean", "description": "Apakah hasilnya Triple/Leopard" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Waktu permainan" },
+        "predictionSize": { "type": "string", "description": "Prediksi ukuran dari AI" },
+        "predictionParity": { "type": "string", "description": "Prediksi paritas dari AI" },
+        "isCorrectSize": { "type": "boolean", "description": "Ketepatan prediksi ukuran" },
+        "isCorrectParity": { "type": "boolean", "description": "Ketepatan prediksi paritas" }
+      },
+      "required": ["dice", "total", "createdAt"]
+    }
+  },
+  "auth": {
+    "providers": ["anonymous"]
+  },
+  "firestore": {
+    "/game_history": {
+      "schema": "GameHistory",
+      "description": "Koleksi global untuk semua histori permainan Sic Bo."
+    }
+  }
+}

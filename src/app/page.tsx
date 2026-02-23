@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -6,7 +7,6 @@ import {
   Trash2, 
   Target, 
   TrendingUp, 
-  AlertTriangle, 
   CheckCircle2, 
   XCircle, 
   BarChart3,
@@ -17,11 +17,10 @@ import {
   Trophy,
   Dices,
   ShieldCheck,
-  AlertCircle,
   Flame,
   Bomb,
   Activity,
-  ChevronRight
+  Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +44,17 @@ import {
 } from '@/ai/flows/predict-leopard-opportunity';
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useFirestore, useCollection } from '@/firebase';
+import { 
+  collection, 
+  addDoc, 
+  query, 
+  orderBy, 
+  limit, 
+  serverTimestamp, 
+  writeBatch, 
+  getDocs 
+} from 'firebase/firestore';
 
 const MULTIPLIERS = [
   { level: 1, multiplier: 1, text: "Lvl 1" },
@@ -59,20 +69,38 @@ const DEFAULT_CAPITAL = 1000000;
 const DEFAULT_BET = 10000;
 
 export default function SicboOracle() {
-  const [history, setHistory] = useState<any[]>([]);
-  const [currentRoll, setCurrentRoll] = useState<number[]>([]);
+  const db = useFirestore();
   const [initialCapital, setInitialCapital] = useState(DEFAULT_CAPITAL);
   const [balance, setBalance] = useState(DEFAULT_CAPITAL);
   const [baseBet, setBaseBet] = useState(DEFAULT_BET);
   const [showResetModal, setShowResetModal] = useState(false);
   const [loadingAI, setLoadingAI] = useState(false);
+  const [currentRoll, setCurrentRoll] = useState<number[]>([]);
   
+  // Fetch history from Firestore
+  const historyQuery = useMemo(() => {
+    if (!db) return null;
+    return query(collection(db, 'game_history'), orderBy('createdAt', 'desc'), limit(50));
+  }, [db]);
+
+  const { data: history, loading: loadingHistory } = useCollection<any>(historyQuery);
+
   const [prediction, setPrediction] = useState<PredictSicBoOutcomeOutput | null>(null);
   const [leopardStatus, setLeopardStatus] = useState<PredictLeopardOpportunityOutput | null>(null);
 
+  // Sync balance with local capital if history is empty
   useEffect(() => {
-    if (history.length === 0) setBalance(initialCapital);
-  }, [initialCapital, history.length]);
+    if (history.length === 0 && !loadingHistory) setBalance(initialCapital);
+  }, [initialCapital, history.length, loadingHistory]);
+
+  // Calculate Balance from History
+  useEffect(() => {
+    if (history.length > 0) {
+      // Kita hitung saldo terakhir dari entri paling baru di Firestore jika tersedia, 
+      // atau kalkulasi ulang dari initialCapital.
+      // Untuk MVP, kita biarkan state balance dikelola lokal saat sesi berjalan.
+    }
+  }, [history]);
 
   const stats = useMemo(() => {
     if (history.length === 0) return { winRate: 0, profit: 0, totalGames: 0 };
@@ -97,6 +125,7 @@ export default function SicboOracle() {
   const suggestedBet = baseBet * MULTIPLIERS[betLevel].multiplier;
 
   const updatePredictions = useCallback(async (currentHistory: any[]) => {
+    if (currentHistory.length < 3) return;
     setLoadingAI(true);
     try {
       const formattedHistory = currentHistory.slice(0, 40).map(h => ({
@@ -120,7 +149,14 @@ export default function SicboOracle() {
     }
   }, []);
 
-  const processRoll = useCallback((roll: number[]) => {
+  // Update AI when history changes
+  useEffect(() => {
+    if (history.length > 0) {
+      updatePredictions(history);
+    }
+  }, [history.length]);
+
+  const processRoll = useCallback(async (roll: number[]) => {
     const total = roll.reduce((a, b) => a + b, 0);
     const isLeopard = roll[0] === roll[1] && roll[1] === roll[2];
     const isBig = !isLeopard && total >= 11;
@@ -149,8 +185,6 @@ export default function SicboOracle() {
     }
 
     const newEntry = {
-      id: Date.now(),
-      num: history.length + 1,
       dice: roll,
       total,
       isBig,
@@ -160,16 +194,20 @@ export default function SicboOracle() {
       isCorrectParity: isLeopard ? false : isCorrectParity,
       betAmount: suggestedBet,
       currentBalance: newBalance,
-      predictionSize: predictedSize,
-      predictionParity: predictedParity
+      predictionSize: predictedSize || null,
+      predictionParity: predictedParity || null,
+      createdAt: serverTimestamp()
     };
 
-    const newHistory = [newEntry, ...history];
-    setHistory(newHistory);
-    setBalance(newBalance);
-    setCurrentRoll([]);
-    updatePredictions(newHistory);
-  }, [balance, suggestedBet, prediction, history, updatePredictions]);
+    try {
+      await addDoc(collection(db, 'game_history'), newEntry);
+      setBalance(newBalance);
+      setCurrentRoll([]);
+    } catch (err) {
+      console.error("Firestore Save Error:", err);
+      toast({ title: "Database Sync Error", variant: "destructive" });
+    }
+  }, [balance, suggestedBet, prediction, db]);
 
   const handleNumberClick = (num: number) => {
     if (currentRoll.length < 3) {
@@ -184,14 +222,23 @@ export default function SicboOracle() {
     processRoll(dice);
   };
 
-  const resetAll = () => {
-    setHistory([]);
-    setBalance(initialCapital);
-    setPrediction(null);
-    setLeopardStatus(null);
-    setCurrentRoll([]);
-    setShowResetModal(false);
-    toast({ title: "System Reset Successful" });
+  const resetAll = async () => {
+    try {
+      const q = query(collection(db, 'game_history'));
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+
+      setBalance(initialCapital);
+      setPrediction(null);
+      setLeopardStatus(null);
+      setCurrentRoll([]);
+      setShowResetModal(false);
+      toast({ title: "Cloud Database Purged" });
+    } catch (err) {
+      toast({ title: "Reset Failed", variant: "destructive" });
+    }
   };
 
   const formatIDR = (val: number) => {
@@ -209,9 +256,9 @@ export default function SicboOracle() {
               <BrainCircuit className="text-white" size={20} />
             </div>
             <div className="hidden sm:block">
-              <h1 className="text-xl font-black tracking-tighter text-white uppercase italic leading-none">Oracle AI <span className="text-primary font-normal">X-100</span></h1>
+              <h1 className="text-xl font-black tracking-tighter text-white uppercase italic leading-none">Oracle AI <span className="text-primary font-normal">Cloud</span></h1>
               <p className="text-[8px] text-muted-foreground font-black flex items-center gap-1 tracking-[0.2em] uppercase mt-0.5">
-                <ShieldCheck size={10} className="text-accent" /> Neural Pattern Analyzer
+                <ShieldCheck size={10} className="text-accent" /> Persistence Enabled
               </p>
             </div>
           </div>
@@ -238,12 +285,19 @@ export default function SicboOracle() {
 
       <main className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
         
+        {loadingHistory && (
+          <div className="flex items-center justify-center p-12 gap-3 text-primary">
+            <Loader2 className="animate-spin" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Synchronizing Cloud Data...</span>
+          </div>
+        )}
+
         {/* Quick Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: 'Oracle Winrate', value: `${stats.winRate}%`, icon: Trophy, color: 'text-accent', bg: 'bg-accent/10' },
             { label: 'Net Profit', value: formatIDR(stats.profit), icon: TrendingUp, color: stats.profit >= 0 ? 'text-accent' : 'text-destructive', bg: stats.profit >= 0 ? 'bg-accent/10' : 'bg-destructive/10' },
-            { label: 'Cycle Progress', value: `Round ${stats.totalGames}`, icon: HistoryIcon, color: 'text-primary', bg: 'bg-primary/10' },
+            { label: 'Total Cycles', value: `Round ${stats.totalGames}`, icon: HistoryIcon, color: 'text-primary', bg: 'bg-primary/10' },
             { label: 'Risk Level', value: currentLossStreak > 3 ? 'EXTREME' : 'STABLE', icon: Activity, color: currentLossStreak > 3 ? 'text-destructive' : 'text-accent', bg: currentLossStreak > 3 ? 'bg-destructive/10' : 'bg-accent/10' },
           ].map((stat, i) => (
             <Card key={i} className="border-white/5 bg-white/5 rounded-2xl">
@@ -268,18 +322,18 @@ export default function SicboOracle() {
               {loadingAI && (
                 <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-20 flex flex-col items-center justify-center space-y-4">
                   <Zap className="text-primary animate-pulse" size={48} />
-                  <p className="text-[10px] font-black uppercase tracking-[0.5em] text-primary">Scanning Neural Network</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.5em] text-primary">Cloud Neural Processing</p>
                 </div>
               )}
               <CardHeader className="flex flex-row items-center justify-between border-b border-white/5 bg-white/2 px-6 py-4">
                 <CardTitle className="text-[10px] font-black text-white uppercase flex items-center gap-2 tracking-[0.2em]">
-                  <Target size={14} className="text-primary" /> Strategy Engine
+                  <Target size={14} className="text-primary" /> Global Pattern Engine
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Button onClick={simulateRoll} variant="ghost" size="sm" className="h-7 text-[8px] font-black uppercase tracking-widest text-white/40 hover:text-primary">
                     AI Simulate
                   </Button>
-                  <Badge className="bg-accent text-white text-[8px] px-2 py-0.5 font-black">ACTIVE</Badge>
+                  <Badge className="bg-accent text-white text-[8px] px-2 py-0.5 font-black">SYNCED</Badge>
                 </div>
               </CardHeader>
               <CardContent className="p-6 sm:p-10 space-y-8">
@@ -364,7 +418,7 @@ export default function SicboOracle() {
                     <span className="text-white bg-accent/20 px-2 py-0.5 rounded-md">{prediction?.predictedParity || '---'}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] font-bold border-t border-white/5 pt-2">
-                    <span className="text-primary uppercase">TOTAL RECOVERY BET</span>
+                    <span className="text-primary uppercase">RECOVERY UNIT</span>
                     <span className="text-white font-black">{formatIDR(suggestedBet)}</span>
                   </div>
                 </div>
@@ -378,7 +432,6 @@ export default function SicboOracle() {
               <CardHeader className="bg-white/2 px-6 py-4">
                 <CardTitle className="text-[9px] font-black uppercase text-white tracking-widest flex items-center justify-between">
                   Manual Sensor Input
-                  <Button variant="ghost" size="sm" onClick={() => setHistory(h => h.slice(1))} className="h-6 text-[8px] opacity-40 hover:opacity-100">REV LAST</Button>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-6">
@@ -409,7 +462,7 @@ export default function SicboOracle() {
             <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl">
               <CardHeader className="px-6 py-4 border-b border-white/5">
                 <CardTitle className="text-[9px] font-black uppercase text-white tracking-widest flex items-center gap-2">
-                  <Settings2 size={14} /> Oracle Configuration
+                  <Settings2 size={14} /> Global Configuration
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-5">
@@ -437,7 +490,7 @@ export default function SicboOracle() {
                   />
                 </div>
                 <div className="pt-4 border-t border-white/5">
-                  <p className="text-[8px] font-black text-muted-foreground uppercase mb-3 tracking-widest text-center">Recovery Ladder (Martingale)</p>
+                  <p className="text-[8px] font-black text-muted-foreground uppercase mb-3 tracking-widest text-center">Recovery Ladder</p>
                   <div className="grid grid-cols-3 gap-1.5">
                     {MULTIPLIERS.map((m, i) => (
                       <div key={i} className={cn("p-2 rounded-lg flex flex-col items-center border transition-all", 
@@ -459,39 +512,27 @@ export default function SicboOracle() {
           <Card className="border-white/10 bg-[#0a0a0a] rounded-3xl overflow-hidden shadow-2xl">
             <CardHeader className="bg-white/2 p-5 border-b border-white/5 flex flex-row items-center justify-between">
               <CardTitle className="text-[9px] font-black uppercase text-white tracking-[0.3em] flex items-center gap-2">
-                <BarChart3 size={16} /> Neural Audit Log
+                <BarChart3 size={16} /> Cloud Neural Audit Log
               </CardTitle>
-              <div className="flex gap-4">
-                <div className="flex items-center gap-1.5">
-                   <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_5px_theme(colors.primary.DEFAULT)]" />
-                   <span className="text-[8px] font-black text-muted-foreground">BIG/SMALL HIT</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                   <div className="w-2 h-2 rounded-full bg-accent shadow-[0_0_5px_theme(colors.accent.DEFAULT)]" />
-                   <span className="text-[8px] font-black text-muted-foreground">ODD/EVEN HIT</span>
-                </div>
-              </div>
             </CardHeader>
             <div className="overflow-x-auto">
               <table className="w-full text-center text-xs">
                 <thead>
                   <tr className="bg-black/40 text-[9px] font-black text-muted-foreground uppercase tracking-widest border-b border-white/5">
-                    <th className="p-4">Cycle</th>
-                    <th className="p-4">Dice Pattern</th>
+                    <th className="p-4">Pattern</th>
                     <th className="p-4">Total</th>
                     <th className="p-4">Result</th>
-                    <th className="p-4">Oracle Prediction Accuracy</th>
-                    <th className="p-4 text-right pr-8">Bankroll Delta</th>
+                    <th className="p-4">Accuracy</th>
+                    <th className="p-4 text-right pr-8">Bankroll</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {history.map((row) => (
-                    <tr key={row.id} className="hover:bg-white/2 transition-colors">
-                      <td className="p-4 text-muted-foreground font-black">#{row.num}</td>
+                  {history.map((row: any, i: number) => (
+                    <tr key={row.id || i} className="hover:bg-white/2 transition-colors">
                       <td className="p-4">
-                        <div className="flex justify-center gap-1.5">
+                        <div className="flex justify-center gap-1">
                           {row.dice.map((d: number, idx: number) => (
-                            <span key={idx} className={cn("w-6 h-6 rounded-md flex items-center justify-center font-black text-[10px] border", 
+                            <span key={idx} className={cn("w-5 h-5 rounded-md flex items-center justify-center font-black text-[9px] border", 
                               row.isLeopard ? 'bg-amber-500 border-amber-600 text-black' : 'bg-white/10 border-white/20 text-white'
                             )}>{d}</span>
                           ))}
@@ -506,31 +547,22 @@ export default function SicboOracle() {
                             )}>
                               {row.isLeopard ? 'TRIPLE' : row.isBig ? 'BIG' : 'SMALL'}
                             </span>
-                            <span className="text-[8px] text-muted-foreground font-bold uppercase">{row.isOdd ? 'ODD' : 'EVEN'}</span>
                          </div>
                       </td>
                       <td className="p-4">
-                        <div className="flex flex-col items-center gap-1.5">
-                           <div className="flex items-center gap-4">
-                              <div className="flex flex-col items-center">
-                                 <span className="text-[7px] text-muted-foreground uppercase font-black mb-1">Size</span>
-                                 <div className={cn("flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-black", 
-                                    row.isCorrectSize ? 'bg-primary/20 text-primary' : 'bg-white/5 text-white/20'
-                                 )}>
-                                    {row.isCorrectSize ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
-                                    {row.predictionSize || '---'}
-                                 </div>
-                              </div>
-                              <div className="flex flex-col items-center">
-                                 <span className="text-[7px] text-muted-foreground uppercase font-black mb-1">Parity</span>
-                                 <div className={cn("flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-black", 
-                                    row.isCorrectParity ? 'bg-accent/20 text-accent' : 'bg-white/5 text-white/20'
-                                 )}>
-                                    {row.isCorrectParity ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
-                                    {row.predictionParity || '---'}
-                                 </div>
-                              </div>
-                           </div>
+                        <div className="flex items-center justify-center gap-2">
+                            <div className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black", 
+                                row.isCorrectSize ? 'bg-primary/20 text-primary' : 'bg-white/5 text-white/20'
+                            )}>
+                                {row.isCorrectSize ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
+                                SIZE
+                            </div>
+                            <div className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black", 
+                                row.isCorrectParity ? 'bg-accent/20 text-accent' : 'bg-white/5 text-white/20'
+                            )}>
+                                {row.isCorrectParity ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
+                                PARITY
+                            </div>
                         </div>
                       </td>
                       <td className="p-4 text-right pr-8">
@@ -553,14 +585,14 @@ export default function SicboOracle() {
       <Dialog open={showResetModal} onOpenChange={setShowResetModal}>
         <DialogContent className="bg-[#0a0a0a] border-white/10 rounded-2xl max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-xl font-black text-destructive uppercase italic tracking-tight">System Purge?</DialogTitle>
+            <DialogTitle className="text-xl font-black text-destructive uppercase italic tracking-tight">Cloud Reset?</DialogTitle>
             <DialogDescription className="text-muted-foreground pt-3 text-xs font-medium leading-relaxed">
-              Seluruh histori algoritma akan dihapus. Saldo akan dikembalikan ke modal awal {formatIDR(initialCapital)}.
+              Seluruh data histori di Cloud Firestore akan dihapus permanen.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-6 gap-2">
             <Button variant="secondary" onClick={() => setShowResetModal(false)} className="rounded-xl h-10 px-4 text-[10px] font-black uppercase">Abort</Button>
-            <Button variant="destructive" onClick={resetAll} className="rounded-xl h-10 px-4 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-destructive/10">Purge Data</Button>
+            <Button variant="destructive" onClick={resetAll} className="rounded-xl h-10 px-4 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-destructive/10">Purge Cloud</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
